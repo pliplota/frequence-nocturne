@@ -20,15 +20,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer ffmpeg et edge-tts
+      - name: Installer ffmpeg
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q ffmpeg
-          pip install edge-tts
 
       - name: Générer l'épisode du jour
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
           TRIGGER_EVENT: ${{ github.event_name }}
         run: python generate_episode.py
 

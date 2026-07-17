@@ -5,22 +5,24 @@ Fréquence Nocturne — générateur d'épisode quotidien.
 
 Pipeline :
   1. Génère le texte de l'épisode (Gemini API, clé dans GEMINI_API_KEY)
-  2. Synthèse vocale gratuite (Edge TTS, voix fr-FR-HenriNeural)
+  2. Synthèse vocale (Google Cloud Text-to-Speech, clé dans GOOGLE_TTS_API_KEY)
   3. Mixage voix + musique d'ambiance (ffmpeg)
   4. Mise à jour du flux RSS lu par Spotify
 
 Usage : python generate_episode.py
 """
 
-import asyncio
+import base64
 import datetime as dt
 import html
 import json
 import os
 import random
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -149,19 +151,73 @@ def call_gemini(prompt):
 
 
 # ---------------------------------------------------------------------------
-# 2. Synthèse vocale (Edge TTS — gratuit)
+# 2. Synthèse vocale (Google Cloud Text-to-Speech, voix Neural2)
 # ---------------------------------------------------------------------------
 
-async def synthesize(text, out_path):
-    import edge_tts
+def chunk_text(text, max_bytes=4500):
+    """Découpe le texte en morceaux < 5000 octets (limite de l'API Google TTS
+    par requête), sans couper au milieu d'une phrase."""
+    sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if current and len(candidate.encode("utf-8")) > max_bytes:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
 
-    communicate = edge_tts.Communicate(
-        text,
-        voice=CONFIG["voice"],
-        rate=CONFIG.get("voice_rate", "-8%"),
-        pitch=CONFIG.get("voice_pitch", "-4Hz"),
+
+def synthesize_chunk(text, api_key, out_path):
+    url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + api_key
+    body = json.dumps(
+        {
+            "input": {"text": text},
+            "voice": {
+                "languageCode": CONFIG.get("language_code", "fr-FR"),
+                "name": CONFIG.get("voice", "fr-FR-Neural2-G"),
+            },
+            "audioConfig": {
+                "audioEncoding": "LINEAR16",
+                "speakingRate": CONFIG.get("voice_rate", 0.92),
+                "pitch": CONFIG.get("voice_pitch", -2.0),
+            },
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body, headers={"Content-Type": "application/json"}
     )
-    await communicate.save(out_path)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = json.load(r)
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(data["audioContent"]))
+
+
+def synthesize(text, out_path):
+    api_key = os.environ.get("GOOGLE_TTS_API_KEY")
+    if not api_key:
+        sys.exit("ERREUR : variable d'environnement GOOGLE_TTS_API_KEY absente.")
+
+    tmp_dir = tempfile.mkdtemp(prefix="tts_")
+    try:
+        list_path = os.path.join(tmp_dir, "list.txt")
+        with open(list_path, "w", encoding="utf-8") as list_file:
+            for i, chunk in enumerate(chunk_text(text)):
+                part_path = os.path.join(tmp_dir, f"part_{i:03d}.wav")
+                synthesize_chunk(chunk, api_key, part_path)
+                list_file.write(f"file '{part_path}'\n")
+        subprocess.check_call(
+            [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
+                "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", out_path,
+            ]
+        )
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -329,9 +385,9 @@ def main():
     script = ep_data["script"].strip()
     print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
 
-    print("2/4  Synthèse vocale (Edge TTS)…")
+    print("2/4  Synthèse vocale (Google Cloud TTS)…")
     voice_path = os.path.join(ROOT, "voice_tmp.mp3")
-    asyncio.run(synthesize(script, voice_path))
+    synthesize(script, voice_path)
 
     print("3/4  Mixage avec la musique d'ambiance (ffmpeg)…")
     out_path = os.path.join(EPISODES_DIR, filename)

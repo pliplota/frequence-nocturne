@@ -1,7 +1,7 @@
 # Fréquence Nocturne — Guide d'installation
 
 Podcast quotidien 100 % automatique et 100 % gratuit :
-texte généré par Gemini → voix Edge TTS → mixage ffmpeg → flux RSS → Spotify.
+texte généré par Gemini → voix Google Cloud Text-to-Speech → mixage ffmpeg → flux RSS → Spotify.
 Aucun serveur chez toi : tout tourne sur GitHub Actions.
 
 ---
@@ -22,6 +22,26 @@ Aucun serveur chez toi : tout tourne sur GitHub Actions.
    (c'est la même que pour ton Studio Pocket).
 2. Dans le dépôt : *Settings → Secrets and variables → Actions → New repository secret*.
 3. Nom : `GEMINI_API_KEY` — Valeur : ta clé. Elle ne sera jamais visible.
+
+## 2bis. Ajouter ta clé Google Cloud Text-to-Speech
+
+La voix est synthétisée par Google Cloud TTS (voix Neural2, plus naturelle
+qu'Edge TTS). Contrairement à la clé Gemini, celle-ci nécessite un compte
+Google Cloud avec la facturation activée (carte bancaire enregistrée) —
+mais l'usage reste dans le palier gratuit tant que le podcast ne dépasse
+pas quelques millions de caractères par mois (largement suffisant pour un
+épisode quotidien). Vérifie les tarifs actuels sur
+https://cloud.google.com/text-to-speech/pricing avant d'activer, les
+paliers gratuits pouvant changer.
+
+1. Crée un projet sur https://console.cloud.google.com, active la
+   facturation, puis active l'API *Cloud Text-to-Speech*
+   (*APIs & Services → Enable APIs and Services*).
+2. Crée une clé API (*APIs & Services → Credentials → Create credentials →
+   API key*), et restreins-la à l'API *Cloud Text-to-Speech* uniquement.
+3. Dans le dépôt : *Settings → Secrets and variables → Actions → New
+   repository secret*.
+4. Nom : `GOOGLE_TTS_API_KEY` — Valeur : ta clé. Elle ne sera jamais visible.
 
 ## 3. Ajouter ta musique et la pochette
 
