@@ -1,0 +1,40 @@
+name: Épisode quotidien
+
+on:
+  schedule:
+    # 03:30 UTC = 05:30 à Paris en été (04:30 en hiver).
+    # Marge volontaire pour que Spotify ait rafraîchi le flux avant 07:00.
+    - cron: "30 3 * * *"
+  workflow_dispatch: {}   # permet aussi de lancer un épisode à la main
+
+permissions:
+  contents: write
+
+jobs:
+  generer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer ffmpeg et edge-tts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg
+          pip install edge-tts
+
+      - name: Générer l'épisode du jour
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python generate_episode.py
+
+      - name: Publier (commit + push)
+        run: |
+          git config user.name "frequence-nocturne-bot"
+          git config user.email "actions@github.com"
+          git add docs/
+          git diff --cached --quiet || git commit -m "Épisode du $(date -u +%F)"
+          git push
