@@ -33,6 +33,11 @@ Aucun serveur chez toi : tout tourne sur GitHub Actions.
 - Mets la pochette de l'émission dans `docs/cover.jpg`
   (image **carrée**, entre 1400×1400 et 3000×3000 px, JPG ou PNG —
   exigence de Spotify).
+- `music/generique_intro.mp3` et `music/generique_outro.mp3` sont le
+  générique (jingle) joué en ouverture et fermeture de chaque épisode,
+  distinct de la musique d'ambiance en fond continu. Une version
+  synthétisée (friture radio ↔ accord) est fournie par défaut ; tu peux
+  la remplacer par tes propres fichiers du même nom.
 
 ## 4. Activer GitHub Pages
 

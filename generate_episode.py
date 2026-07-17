@@ -28,6 +28,8 @@ DOCS = os.path.join(ROOT, "docs")
 EPISODES_DIR = os.path.join(DOCS, "episodes")
 EPISODES_JSON = os.path.join(DOCS, "episodes.json")
 MUSIC = os.path.join(ROOT, "music", "ambiance.mp3")
+GENERIQUE_INTRO = os.path.join(ROOT, "music", "generique_intro.mp3")
+GENERIQUE_OUTRO = os.path.join(ROOT, "music", "generique_outro.mp3")
 
 CONFIG = json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8"))
 
@@ -177,37 +179,64 @@ def probe_duration(path):
 
 
 def mix(voice_path, out_path):
-    if not os.path.isfile(MUSIC):
-        print("AVERTISSEMENT : music/ambiance.mp3 introuvable — épisode publié sans musique.")
-        subprocess.check_call(
-            ["ffmpeg", "-y", "-i", voice_path, "-c:a", "libmp3lame",
-             "-b:a", "128k", "-ar", "44100", out_path]
-        )
-        return
+    have_music = os.path.isfile(MUSIC)
+    if not have_music:
+        print("AVERTISSEMENT : music/ambiance.mp3 introuvable — épisode publié sans musique de fond.")
+    have_intro = os.path.isfile(GENERIQUE_INTRO)
+    have_outro = os.path.isfile(GENERIQUE_OUTRO)
 
     voice_dur = probe_duration(voice_path)
     lead_in = 5.0          # musique seule avant la voix
     tail = 6.0             # musique seule après la voix
     total = lead_in + voice_dur + tail
     vol = CONFIG.get("music_volume", 0.16)
-    filter_complex = (
-        f"[0:a]adelay={int(lead_in*1000)}|{int(lead_in*1000)},"
-        f"apad=pad_dur={tail}[v];"
-        f"[1:a]volume={vol}[m];"
-        f"[v][m]amix=inputs=2:duration=first:dropout_transition=4[mix];"
-        f"[mix]afade=t=in:st=0:d=2,afade=t=out:st={total-5:.2f}:d=5[out]"
+
+    cmd = ["ffmpeg", "-y", "-i", voice_path]
+    idx = 1  # 0 = voix
+    if have_music:
+        cmd += ["-stream_loop", "-1", "-i", MUSIC]
+        music_idx, idx = idx, idx + 1
+    if have_intro:
+        cmd += ["-i", GENERIQUE_INTRO]
+        intro_idx, idx = idx, idx + 1
+    if have_outro:
+        cmd += ["-i", GENERIQUE_OUTRO]
+        outro_idx, idx = idx, idx + 1
+
+    filters = []
+    if have_music:
+        filters.append(f"[0:a]adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[v]")
+        filters.append(f"[{music_idx}:a]volume={vol}[m]")
+        filters.append("[v][m]amix=inputs=2:duration=first:dropout_transition=4[bedraw]")
+    else:
+        filters.append(f"[0:a]adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[bedraw]")
+    filters.append(
+        f"[bedraw]afade=t=in:st=0:d=2,afade=t=out:st={total-5:.2f}:d=5,"
+        f"aformat=sample_rates=44100:channel_layouts=stereo[bed]"
     )
-    subprocess.check_call(
-        [
-            "ffmpeg", "-y",
-            "-i", voice_path,
-            "-stream_loop", "-1", "-i", MUSIC,
-            "-filter_complex", filter_complex,
-            "-map", "[out]",
-            "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100",
-            out_path,
-        ]
-    )
+
+    parts = []
+    if have_intro:
+        filters.append(f"[{intro_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[gi]")
+        parts.append("[gi]")
+    parts.append("[bed]")
+    if have_outro:
+        filters.append(f"[{outro_idx}:a]aformat=sample_rates=44100:channel_layouts=stereo[go]")
+        parts.append("[go]")
+
+    if len(parts) > 1:
+        filters.append("".join(parts) + f"concat=n={len(parts)}:v=0:a=1[out]")
+        final = "[out]"
+    else:
+        final = "[bed]"
+
+    cmd += [
+        "-filter_complex", ";".join(filters),
+        "-map", final,
+        "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100",
+        out_path,
+    ]
+    subprocess.check_call(cmd)
 
 
 # ---------------------------------------------------------------------------
