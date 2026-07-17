@@ -29,6 +29,7 @@ jobs:
       - name: Générer l'épisode du jour
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TRIGGER_EVENT: ${{ github.event_name }}
         run: python generate_episode.py
 
       - name: Publier (commit + push)

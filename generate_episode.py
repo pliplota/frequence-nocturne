@@ -310,9 +310,18 @@ def main():
 
     today = dt.datetime.now(dt.timezone.utc)
     stamp = today.strftime("%Y-%m-%d")
-    if any(ep["file"].startswith(stamp) for ep in episodes):
+    existing_today = [ep for ep in episodes if ep["file"].startswith(stamp)]
+
+    is_scheduled = os.environ.get("TRIGGER_EVENT", "schedule") == "schedule"
+    if is_scheduled and existing_today:
         print(f"Épisode du {stamp} déjà généré — rien à faire.")
         return
+
+    if existing_today:
+        filename = f"{stamp}-{len(existing_today) + 1}.mp3"
+    else:
+        filename = f"{stamp}.mp3"
+    slug = os.path.splitext(filename)[0]
 
     print("1/4  Génération du texte (Gemini)…")
     past_titles = [ep["title"] for ep in episodes]
@@ -325,7 +334,6 @@ def main():
     asyncio.run(synthesize(script, voice_path))
 
     print("3/4  Mixage avec la musique d'ambiance (ffmpeg)…")
-    filename = f"{stamp}.mp3"
     out_path = os.path.join(EPISODES_DIR, filename)
     mix(voice_path, out_path)
     os.remove(voice_path)
@@ -340,7 +348,7 @@ def main():
             "file": filename,
             "bytes": os.path.getsize(out_path),
             "duration": hhmmss(duration),
-            "guid": f"frequence-nocturne-{stamp}",
+            "guid": f"frequence-nocturne-{slug}",
         }
     )
 
