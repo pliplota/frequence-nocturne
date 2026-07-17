@@ -57,9 +57,35 @@ THEMES = [
 ]
 
 
+NUM_WORDS = {1: "un", 2: "deux", 3: "trois", 4: "quatre", 5: "cinq"}
+
+
 def build_prompt(past_titles):
-    theme1, theme2 = random.sample(THEMES, 2)
+    n = CONFIG.get("num_testimonies", 2)
+    themes = random.sample(THEMES, n)
     avoid = "\n".join(f"- {t}" for t in past_titles[-12:]) or "(aucun)"
+
+    structure = [
+        f'1. INTRO : le présentateur dit exactement cette phrase rituelle :\n'
+        f'   "{CONFIG["intro_ritual"]}"\n'
+        f'   puis il se présente ("Bonsoir, ici {CONFIG["presenter_name"]}…"), annonce brièvement '
+        f'les {NUM_WORDS.get(n, n)} témoignages du soir (sans divulgâcher), de façon variée à chaque épisode.'
+    ]
+    step = 2
+    for i, theme in enumerate(themes, start=1):
+        structure.append(f"{step}. TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 550-700 mots.")
+        step += 1
+        if i < n:
+            structure.append(f"{step}. Transition + commentaire sobre du présentateur.")
+        else:
+            structure.append(f"{step}. Bref commentaire.")
+        step += 1
+    structure.append(
+        f'{step}. OUTRO : le présentateur conclut avec exactement ce texte rituel :\n'
+        f'   "{CONFIG["outro_ritual"]}"'
+    )
+    structure_text = "\n".join(structure)
+
     return f"""Tu écris le script d'un épisode du podcast français "{CONFIG['show_name']}".
 
 CONCEPT : {CONFIG['presenter_name']}, la cinquantaine, ancien journaliste de nuit, voix grave et posée,
@@ -78,20 +104,11 @@ RÈGLES D'ÉCRITURE (très important) :
 - Chaque témoignage est signé d'un prénom + initiale + département
   (ex : "Nathalie R., dans l'Ain"). Prénoms français courants variés.
 - Style oral : phrases courtes, respirations, langage parlé naturel.
-- Le présentateur fait une courte transition entre les deux témoignages,
+- Le présentateur fait une courte transition entre chaque témoignage,
   et un très bref commentaire sobre après chacun (2-3 phrases max).
 
 STRUCTURE DE L'ÉPISODE :
-1. INTRO : le présentateur dit exactement cette phrase rituelle :
-   "{CONFIG['intro_ritual']}"
-   puis il se présente ("Bonsoir, ici {CONFIG['presenter_name']}…"), annonce brièvement
-   les deux témoignages du soir (sans divulgâcher), de façon variée à chaque épisode.
-2. TÉMOIGNAGE 1 : thème imposé : {theme1}. Environ 550-700 mots.
-3. Transition + commentaire sobre du présentateur.
-4. TÉMOIGNAGE 2 : thème imposé : {theme2}. Environ 550-700 mots.
-5. Bref commentaire.
-6. OUTRO : le présentateur conclut avec exactement ce texte rituel :
-   "{CONFIG['outro_ritual']}"
+{structure_text}
 
 Titres d'épisodes déjà utilisés (NE PAS répéter les mêmes situations) :
 {avoid}
