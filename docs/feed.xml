@@ -4,16 +4,16 @@
      xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Fréquence Nocturne</title>
-    <description>Chaque nuit, Antoine Mercier lit les témoignages que vous lui envoyez. Des histoires ordinaires, vécues par des gens ordinaires, qui n&#x27;ont jamais trouvé d&#x27;explication. Envoyez votre récit à frequence.nocturne.temoignages@gmail.com</description>
-    <link>https://VOTRE-PSEUDO.github.io/frequence-nocturne/</link>
+    <description>Chaque nuit, Antoine Mercier lit les témoignages que vous lui envoyez. Des histoires ordinaires, vécues par des gens ordinaires, qui n&#x27;ont jamais trouvé d&#x27;explication. Envoyez votre récit à frequencenocturne@proton.me</description>
+    <link>https://pliplota.github.io/frequence-nocturne/</link>
     <language>fr</language>
-    <atom:link href="https://VOTRE-PSEUDO.github.io/frequence-nocturne/feed.xml" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://pliplota.github.io/frequence-nocturne/feed.xml" rel="self" type="application/rss+xml"/>
     <itunes:author>Fréquence Nocturne</itunes:author>
     <itunes:owner>
       <itunes:name>Fréquence Nocturne</itunes:name>
       <itunes:email>frequencenocturne@proton.me</itunes:email>
     </itunes:owner>
-    <itunes:image href="https://VOTRE-PSEUDO.github.io/frequence-nocturne/cover.jpg"/>
+    <itunes:image href="https://pliplota.github.io/frequence-nocturne/cover.jpg"/>
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
@@ -21,7 +21,7 @@
       <description>Antoine Mercier nous livre ce soir deux récits troublants : un couple confronté à une étrange vision dans leur nouvelle maison, et un homme perturbé par des mélodies inexpliquées venues des murs de son appartement.</description>
       <pubDate>Fri, 17 Jul 2026 08:04:27 +0000</pubDate>
       <guid isPermaLink="false">frequence-nocturne-2026-07-17</guid>
-      <enclosure url="https://VOTRE-PSEUDO.github.io/frequence-nocturne/episodes/2026-07-17.mp3" length="9805784" type="audio/mpeg"/>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-07-17.mp3" length="9805784" type="audio/mpeg"/>
       <itunes:duration>00:10:13</itunes:duration>
       <itunes:explicit>false</itunes:explicit>
       <itunes:episodeType>full</itunes:episodeType>

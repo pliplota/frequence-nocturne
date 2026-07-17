@@ -1,7 +1,7 @@
 {
   "show_name": "Fréquence Nocturne",
-  "show_description": "Chaque nuit, Antoine Mercier lit les témoignages que vous lui envoyez. Des histoires ordinaires, vécues par des gens ordinaires, qui n'ont jamais trouvé d'explication. Envoyez votre récit à frequence.nocturne.temoignages@gmail.com",
-  "base_url": "https://VOTRE-PSEUDO.github.io/frequence-nocturne",
+  "show_description": "Chaque nuit, Antoine Mercier lit les témoignages que vous lui envoyez. Des histoires ordinaires, vécues par des gens ordinaires, qui n'ont jamais trouvé d'explication. Envoyez votre récit à frequencenocturne@proton.me",
+  "base_url": "https://pliplota.github.io/frequence-nocturne",
   "presenter_name": "Antoine Mercier",
   "contact_email": "frequencenocturne@proton.me",
   "language": "fr",
@@ -10,7 +10,7 @@
   "voice_pitch": "-4Hz",
   "music_volume": 0.16,
   "intro_ritual": "Il est tard. Vous m'écoutez. Et quelqu'un, quelque part, a vu quelque chose qu'il ne s'explique pas.",
-  "outro_ritual": "C'était Fréquence Nocturne. Si vous aussi, une nuit, vous avez vu quelque chose que vous ne vous expliquez pas… écrivez-moi. Frequence point nocturne point temoignages, arobase gmail point com. Je lis tout. Et peut-être que la prochaine voix que vous entendrez ici… sera la vôtre. Bonne nuit.",
+  "outro_ritual": "C'était Fréquence Nocturne. Si vous aussi, une nuit, vous avez vu quelque chose que vous ne vous expliquez pas… écrivez-moi. Fréquence nocturne, arobase proton point me. Je lis tout. Et peut-être que la prochaine voix que vous entendrez ici… sera la vôtre. Bonne nuit.",
   "num_testimonies": 2,
   "target_minutes": 12,
   "author": "Fréquence Nocturne",
