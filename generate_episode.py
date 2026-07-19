@@ -159,22 +159,68 @@ def call_gemini(prompt):
 
 
 # ---------------------------------------------------------------------------
-# 2. Synthèse vocale (Google Cloud Text-to-Speech, voix Neural2)
+# 2. Synthèse vocale (Google Cloud Text-to-Speech)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text, max_bytes=4500):
-    """Découpe le texte en morceaux < 5000 octets (limite de l'API Google TTS
-    par requête), sans couper au milieu d'une phrase."""
+def to_ssml(text):
+    """Ajoute de courtes pauses aux endroits où le texte marque déjà une
+    hésitation (points de suspension, tirets d'incise) plutôt que partout."""
+    escaped = html.escape(text, quote=False)
+    escaped = escaped.replace("…", '…<break time="450ms"/>')
+    escaped = escaped.replace(" — ", ' <break time="300ms"/>— ')
+    return f"<speak>{escaped}</speak>"
+
+
+def _ssml_bytes(text):
+    return len(to_ssml(text).encode("utf-8"))
+
+
+def chunk_text(text, max_bytes=4800):
+    """Découpe le texte en morceaux dont la version SSML (après ajout des
+    balises <break> par to_ssml) reste sous la limite de 5000 octets par
+    requête de l'API Google TTS, sans couper au milieu d'une phrase. Un
+    texte très dense en points de suspension/tirets peut voir sa taille
+    largement augmenter une fois converti en SSML, d'où la mesure sur le
+    texte transformé plutôt que sur le texte brut."""
     sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
     chunks = []
     current = ""
     for sentence in sentences:
         candidate = f"{current} {sentence}".strip() if current else sentence
-        if current and len(candidate.encode("utf-8")) > max_bytes:
+        if _ssml_bytes(candidate) <= max_bytes:
+            current = candidate
+            continue
+        if current:
             chunks.append(current)
+        if _ssml_bytes(sentence) <= max_bytes:
             current = sentence
         else:
-            current = candidate
+            # Phrase seule déjà trop longue une fois convertie en SSML :
+            # repli en dernier recours, découpage mot par mot.
+            current = ""
+            for word in sentence.split():
+                # Un seul "mot" déjà trop long (cas irréaliste pour du texte
+                # généré, mais on ferme la faille) : découpage caractère par
+                # caractère.
+                if _ssml_bytes(word) > max_bytes:
+                    if current:
+                        chunks.append(current)
+                        current = ""
+                    piece = ""
+                    for ch in word:
+                        if piece and _ssml_bytes(piece + ch) > max_bytes:
+                            chunks.append(piece)
+                            piece = ch
+                        else:
+                            piece += ch
+                    current = piece
+                    continue
+                piece = f"{current} {word}".strip() if current else word
+                if current and _ssml_bytes(piece) > max_bytes:
+                    chunks.append(current)
+                    current = word
+                else:
+                    current = piece
     if current:
         chunks.append(current)
     return chunks
@@ -195,7 +241,7 @@ def synthesize_chunk(text, api_key, out_path):
     url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + api_key
     body = json.dumps(
         {
-            "input": {"text": text},
+            "input": {"ssml": to_ssml(text)},
             "voice": {
                 "languageCode": CONFIG.get("language_code", "fr-FR"),
                 "name": voice_name,
