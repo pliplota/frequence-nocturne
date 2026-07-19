@@ -35,6 +35,14 @@ GENERIQUE_OUTRO = os.path.join(ROOT, "music", "generique_outro.mp3")
 
 CONFIG = json.load(open(os.path.join(ROOT, "config.json"), encoding="utf-8"))
 
+# Correspondance entre l'expression cron déclenchée (github.event.schedule)
+# et le suffixe de fichier du créneau. Le créneau du matin n'a pas d'entrée
+# ici : il garde le nom de fichier "brut" {stamp}.mp3 pour rester compatible
+# avec les épisodes déjà publiés avant l'ajout du créneau du soir.
+SCHEDULE_SLOTS = {
+    "30 16 * * *": "soir",
+}
+
 # ---------------------------------------------------------------------------
 # 1. Génération du texte de l'épisode
 # ---------------------------------------------------------------------------
@@ -367,16 +375,27 @@ def main():
     today = dt.datetime.now(dt.timezone.utc)
     stamp = today.strftime("%Y-%m-%d")
     existing_today = [ep for ep in episodes if ep["file"].startswith(stamp)]
+    existing_files_today = {ep["file"] for ep in existing_today}
 
-    is_scheduled = os.environ.get("TRIGGER_EVENT", "schedule") == "schedule"
-    if is_scheduled and existing_today:
-        print(f"Épisode du {stamp} déjà généré — rien à faire.")
-        return
-
-    if existing_today:
-        filename = f"{stamp}-{len(existing_today) + 1}.mp3"
+    trigger = os.environ.get("TRIGGER_EVENT", "schedule")
+    if trigger == "schedule":
+        # Le créneau du matin garde le nom "brut" (compatibilité avec les
+        # épisodes déjà publiés) ; les créneaux suivants ajoutent un suffixe.
+        cron_slot = SCHEDULE_SLOTS.get(os.environ.get("CRON_SCHEDULE", ""))
+        filename = f"{stamp}-{cron_slot}.mp3" if cron_slot else f"{stamp}.mp3"
+        if filename in existing_files_today:
+            print(f"Épisode du {stamp} ({cron_slot or 'matin'}) déjà généré — rien à faire.")
+            return
     else:
-        filename = f"{stamp}.mp3"
+        # Déclenchement manuel : toujours générer, en évitant toute collision
+        # de nom avec un épisode déjà publié ce jour-là (matin, soir ou manuel).
+        if f"{stamp}.mp3" not in existing_files_today:
+            filename = f"{stamp}.mp3"
+        else:
+            n = 2
+            while f"{stamp}-{n}.mp3" in existing_files_today:
+                n += 1
+            filename = f"{stamp}-{n}.mp3"
     slug = os.path.splitext(filename)[0]
 
     print("1/4  Génération du texte (Gemini)…")

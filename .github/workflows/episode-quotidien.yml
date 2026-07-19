@@ -5,6 +5,9 @@ on:
     # 03:30 UTC = 05:30 à Paris en été (04:30 en hiver).
     # Marge volontaire pour que Spotify ait rafraîchi le flux avant 07:00.
     - cron: "30 3 * * *"
+    # 16:30 UTC = 18:30 à Paris en été (17:30 en hiver).
+    # Marge volontaire pour que l'épisode soit prêt avant 20:00.
+    - cron: "30 16 * * *"
   workflow_dispatch: {}   # permet aussi de lancer un épisode à la main
 
 permissions:
@@ -30,6 +33,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
           TRIGGER_EVENT: ${{ github.event_name }}
+          CRON_SCHEDULE: ${{ github.event.schedule }}
         run: python generate_episode.py
 
       - name: Publier (commit + push)
