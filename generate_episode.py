@@ -118,6 +118,9 @@ RÈGLES D'ÉCRITURE (très important) :
 - Style oral : phrases courtes, respirations, langage parlé naturel.
 - Le présentateur fait une courte transition entre chaque témoignage,
   et un très bref commentaire sobre après chacun (2-3 phrases max).
+- Le champ "script" est lu tel quel par une voix de synthèse : AUCUN
+  astérisque, dièse, tiret de liste ou autre symbole de mise en forme
+  Markdown dedans, uniquement du texte brut.
 
 STRUCTURE DE L'ÉPISODE :
 {structure_text}
@@ -156,6 +159,13 @@ def call_gemini(prompt):
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
     start, end = text.find("{"), text.rfind("}")
     return json.loads(text[start : end + 1])
+
+
+def clean_script(text):
+    """Retire les résidus de mise en forme Markdown (astérisques, etc.) que
+    Gemini ajoute parfois malgré la consigne — sans ça la voix les lit à
+    voix haute ("astérisque")."""
+    return re.sub(r"\*+", "", text)
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +464,7 @@ def main():
     print("1/4  Génération du texte (Gemini)…")
     past_titles = [ep["title"] for ep in episodes]
     ep_data = call_gemini(build_prompt(past_titles))
-    script = ep_data["script"].strip()
+    script = clean_script(ep_data["script"].strip())
     print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
 
     print("2/4  Synthèse vocale (Google Cloud TTS)…")
