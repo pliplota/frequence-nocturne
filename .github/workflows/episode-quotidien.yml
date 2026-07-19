@@ -31,7 +31,6 @@ jobs:
       - name: Générer l'épisode du jour
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_TTS_API_KEY: ${{ secrets.GOOGLE_TTS_API_KEY }}
           TRIGGER_EVENT: ${{ github.event_name }}
           CRON_SCHEDULE: ${{ github.event.schedule }}
         run: python generate_episode.py

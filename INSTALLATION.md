@@ -1,7 +1,7 @@
 # Fréquence Nocturne — Guide d'installation
 
-Podcast quotidien 100 % automatique et 100 % gratuit :
-texte généré par Gemini → voix Google Cloud Text-to-Speech → mixage ffmpeg → flux RSS → Spotify.
+Podcast quotidien 100 % automatique :
+texte généré par Gemini → voix Gemini TTS → mixage ffmpeg → flux RSS → Spotify.
 Aucun serveur chez toi : tout tourne sur GitHub Actions.
 
 ---
@@ -18,40 +18,20 @@ Aucun serveur chez toi : tout tourne sur GitHub Actions.
 
 ## 2. Ajouter ta clé Gemini
 
+Cette seule clé sert à la fois pour le texte et pour la voix (Gemini TTS
+utilise la même API que la génération de texte).
+
 1. Récupère une clé gratuite sur https://aistudio.google.com/apikey
    (c'est la même que pour ton Studio Pocket).
 2. Dans le dépôt : *Settings → Secrets and variables → Actions → New repository secret*.
 3. Nom : `GEMINI_API_KEY` — Valeur : ta clé. Elle ne sera jamais visible.
 
-## 2bis. Ajouter ta clé Google Cloud Text-to-Speech
-
-La voix est synthétisée par Google Cloud TTS. Contrairement à la clé
-Gemini, celle-ci nécessite un compte Google Cloud avec la facturation
-activée (carte bancaire enregistrée).
-
-- **Voix Neural2** (`fr-FR-Neural2-G`) : reste dans le palier gratuit tant
-  que le podcast ne dépasse pas quelques millions de caractères par mois
-  (largement suffisant pour un usage quotidien).
-- **Voix Studio** (`fr-FR-Studio-D`, utilisée actuellement — plus naturelle,
-  calibrée pour la narration) : **payante dès le premier caractère**, pas
-  de palier gratuit. Le réglage de tonalité (`voice_pitch`) ne s'applique
-  pas à cette famille de voix (limitation de l'API Google), seul le débit
-  (`voice_rate`) reste ajustable.
-
-Vérifie les tarifs actuels sur https://cloud.google.com/text-to-speech/pricing
-avant d'activer — ils peuvent changer. Avec une voix Studio payante,
-configure aussi une **alerte de budget** pour éviter toute mauvaise
-surprise : *Billing → Budgets & alerts → Create budget* sur ton projet
-Google Cloud, avec un seuil bas (quelques euros).
-
-1. Crée un projet sur https://console.cloud.google.com, active la
-   facturation, puis active l'API *Cloud Text-to-Speech*
-   (*APIs & Services → Enable APIs and Services*).
-2. Crée une clé API (*APIs & Services → Credentials → Create credentials →
-   API key*), et restreins-la à l'API *Cloud Text-to-Speech* uniquement.
-3. Dans le dépôt : *Settings → Secrets and variables → Actions → New
-   repository secret*.
-4. Nom : `GOOGLE_TTS_API_KEY` — Valeur : ta clé. Elle ne sera jamais visible.
+⚠️ Le modèle vocal (`gemini-3.1-flash-tts-preview` dans `config.json`,
+champ `tts_model`) est en préversion : ses conditions d'usage/tarifaires
+peuvent différer de celles des modèles Gemini standard, et son
+comportement (nom exact, disponibilité) peut changer sans préavis côté
+Google. Vérifie ton tableau de bord AI Studio si tu as un doute sur la
+facturation.
 
 ## 3. Ajouter ta musique et la pochette
 
@@ -137,6 +117,12 @@ Amazon Music, etc.
 - **Modifier le style des histoires** : tout le "prompt" d'écriture est
   dans `generate_episode.py`, fonction `build_prompt` — les thèmes sont
   dans la liste `THEMES` en haut du fichier.
+- **Changer de voix ou de ton** : `voice` dans `config.json` prend un nom
+  de voix Gemini TTS (ex. `Charon`, `Puck`, `Umbriel` — teste-les sur
+  https://cloud.google.com/text-to-speech, section démonstration, ou dans
+  Media Studio sur la Console Google Cloud). Le débit/la tonalité ne se
+  règlent plus par des paramètres numériques mais par une consigne en
+  langage naturel : `tts_style_prompt` dans `config.json`.
 - **Transparence** : reste dans la convention du genre (« témoignages
   envoyés par nos auditeurs ») sans affirmer qu'ils sont vérifiés. Et
   dès que de vrais auditeurs t'écriront, tu pourras mélanger vrais

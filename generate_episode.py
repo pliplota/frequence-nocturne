@@ -5,7 +5,7 @@ Fréquence Nocturne — générateur d'épisode quotidien.
 
 Pipeline :
   1. Génère le texte de l'épisode (Gemini API, clé dans GEMINI_API_KEY)
-  2. Synthèse vocale (Google Cloud Text-to-Speech, clé dans GOOGLE_TTS_API_KEY)
+  2. Synthèse vocale (Gemini TTS, même clé GEMINI_API_KEY)
   3. Mixage voix + musique d'ambiance (ffmpeg)
   4. Mise à jour du flux RSS lu par Spotify
 
@@ -15,6 +15,7 @@ Usage : python generate_episode.py
 import base64
 import datetime as dt
 import html
+import io
 import json
 import os
 import random
@@ -24,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+import wave
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(ROOT, "docs")
@@ -191,109 +193,85 @@ def clean_script(text):
 
 
 # ---------------------------------------------------------------------------
-# 2. Synthèse vocale (Google Cloud Text-to-Speech)
+# 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def to_ssml(text):
-    """Ajoute de courtes pauses aux endroits où le texte marque déjà une
-    hésitation (points de suspension, tirets d'incise) plutôt que partout."""
-    escaped = html.escape(text, quote=False)
-    escaped = escaped.replace("…", '…<break time="450ms"/>')
-    escaped = escaped.replace(" — ", ' <break time="300ms"/>— ')
-    return f"<speak>{escaped}</speak>"
-
-
-def _ssml_bytes(text):
-    return len(to_ssml(text).encode("utf-8"))
-
-
-def chunk_text(text, max_bytes=4800):
-    """Découpe le texte en morceaux dont la version SSML (après ajout des
-    balises <break> par to_ssml) reste sous la limite de 5000 octets par
-    requête de l'API Google TTS, sans couper au milieu d'une phrase. Un
-    texte très dense en points de suspension/tirets peut voir sa taille
-    largement augmenter une fois converti en SSML, d'où la mesure sur le
-    texte transformé plutôt que sur le texte brut."""
+def chunk_text(text, max_chars=2500):
+    """Découpe le texte en morceaux d'une taille raisonnable (Gemini TTS
+    recommande des extraits de quelques minutes maximum pour la qualité),
+    sans couper au milieu d'une phrase."""
     sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
     chunks = []
     current = ""
     for sentence in sentences:
         candidate = f"{current} {sentence}".strip() if current else sentence
-        if _ssml_bytes(candidate) <= max_bytes:
-            current = candidate
-            continue
-        if current:
+        if current and len(candidate) > max_chars:
             chunks.append(current)
-        if _ssml_bytes(sentence) <= max_bytes:
             current = sentence
         else:
-            # Phrase seule déjà trop longue une fois convertie en SSML :
-            # repli en dernier recours, découpage mot par mot.
-            current = ""
-            for word in sentence.split():
-                # Un seul "mot" déjà trop long (cas irréaliste pour du texte
-                # généré, mais on ferme la faille) : découpage caractère par
-                # caractère.
-                if _ssml_bytes(word) > max_bytes:
-                    if current:
-                        chunks.append(current)
-                        current = ""
-                    piece = ""
-                    for ch in word:
-                        if piece and _ssml_bytes(piece + ch) > max_bytes:
-                            chunks.append(piece)
-                            piece = ch
-                        else:
-                            piece += ch
-                    current = piece
-                    continue
-                piece = f"{current} {word}".strip() if current else word
-                if current and _ssml_bytes(piece) > max_bytes:
-                    chunks.append(current)
-                    current = word
-                else:
-                    current = piece
+            current = candidate
     if current:
         chunks.append(current)
     return chunks
 
 
-def synthesize_chunk(text, api_key, out_path):
-    voice_name = CONFIG.get("voice", "fr-FR-Neural2-G")
-    audio_config = {
-        "audioEncoding": "LINEAR16",
-        "speakingRate": CONFIG.get("voice_rate", 0.92),
-    }
-    if "Studio" not in voice_name and "Chirp" not in voice_name:
-        # Les voix Studio et Chirp3 HD de Google ne supportent pas (ou pas
-        # de façon documentée) le réglage de pitch — on ne l'envoie que
-        # pour les autres familles de voix (Neural2, Wavenet, etc.).
-        audio_config["pitch"] = CONFIG.get("voice_pitch", -2.0)
+def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_bytes)
+    return buf.getvalue()
 
-    url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + api_key
+
+def synthesize_chunk(text, api_key, out_path):
+    style = CONFIG.get(
+        "tts_style_prompt",
+        "Lis ce texte à voix haute d'un ton calme, posé et mesuré, comme un "
+        "présentateur de radio de nuit, avec de courtes pauses naturelles "
+        "aux points de suspension et aux tirets d'incise :",
+    )
+    url = "https://generativelanguage.googleapis.com/v1beta/interactions"
     body = json.dumps(
         {
-            "input": {"ssml": to_ssml(text)},
-            "voice": {
-                "languageCode": CONFIG.get("language_code", "fr-FR"),
-                "name": voice_name,
+            "model": CONFIG.get("tts_model", "gemini-3.1-flash-tts-preview"),
+            "input": f"{style} {text}",
+            "response_format": {"type": "audio"},
+            "generation_config": {
+                "speech_config": [{"voice": CONFIG.get("voice", "Charon")}]
             },
-            "audioConfig": audio_config,
         }
     ).encode("utf-8")
     req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
+        url,
+        data=body,
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
     )
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:
         data = json.load(r)
+    try:
+        audio_b64 = data["output_audio"]["data"]
+    except (KeyError, TypeError):
+        # Le format exact de la réponse de cette API (preview) n'est pas
+        # documenté publiquement — si la structure ne correspond pas à ce
+        # qu'on attend, on affiche la réponse brute pour diagnostiquer vite
+        # plutôt que de planter avec un KeyError opaque.
+        sys.exit(
+            "ERREUR : réponse Gemini TTS inattendue, structure reçue :\n"
+            + json.dumps(data, ensure_ascii=False)[:2000]
+        )
+    raw = base64.b64decode(audio_b64)
+    if not raw.startswith(b"RIFF"):
+        raw = _pcm_to_wav_bytes(raw)
     with open(out_path, "wb") as f:
-        f.write(base64.b64decode(data["audioContent"]))
+        f.write(raw)
 
 
 def synthesize(text, out_path):
-    api_key = os.environ.get("GOOGLE_TTS_API_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        sys.exit("ERREUR : variable d'environnement GOOGLE_TTS_API_KEY absente.")
+        sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
 
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
@@ -489,7 +467,7 @@ def main():
     script = clean_script(ep_data["script"].strip())
     print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
 
-    print("2/4  Synthèse vocale (Google Cloud TTS)…")
+    print("2/4  Synthèse vocale (Gemini TTS)…")
     voice_path = os.path.join(ROOT, "voice_tmp.mp3")
     synthesize(script, voice_path)
 
