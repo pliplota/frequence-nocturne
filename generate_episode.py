@@ -181,19 +181,26 @@ def chunk_text(text, max_bytes=4500):
 
 
 def synthesize_chunk(text, api_key, out_path):
+    voice_name = CONFIG.get("voice", "fr-FR-Neural2-G")
+    audio_config = {
+        "audioEncoding": "LINEAR16",
+        "speakingRate": CONFIG.get("voice_rate", 0.92),
+    }
+    if "Studio" not in voice_name:
+        # Les voix Studio de Google ne supportent pas le réglage de pitch
+        # (ni via SSML ni via audioConfig) — on ne l'envoie que pour les
+        # autres familles de voix (Neural2, Wavenet, etc.).
+        audio_config["pitch"] = CONFIG.get("voice_pitch", -2.0)
+
     url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + api_key
     body = json.dumps(
         {
             "input": {"text": text},
             "voice": {
                 "languageCode": CONFIG.get("language_code", "fr-FR"),
-                "name": CONFIG.get("voice", "fr-FR-Neural2-G"),
+                "name": voice_name,
             },
-            "audioConfig": {
-                "audioEncoding": "LINEAR16",
-                "speakingRate": CONFIG.get("voice_rate", 0.92),
-                "pitch": CONFIG.get("voice_pitch", -2.0),
-            },
+            "audioConfig": audio_config,
         }
     ).encode("utf-8")
     req = urllib.request.Request(

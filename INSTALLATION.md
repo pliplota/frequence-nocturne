@@ -25,14 +25,24 @@ Aucun serveur chez toi : tout tourne sur GitHub Actions.
 
 ## 2bis. Ajouter ta clé Google Cloud Text-to-Speech
 
-La voix est synthétisée par Google Cloud TTS (voix Neural2, plus naturelle
-qu'Edge TTS). Contrairement à la clé Gemini, celle-ci nécessite un compte
-Google Cloud avec la facturation activée (carte bancaire enregistrée) —
-mais l'usage reste dans le palier gratuit tant que le podcast ne dépasse
-pas quelques millions de caractères par mois (largement suffisant pour un
-épisode quotidien). Vérifie les tarifs actuels sur
-https://cloud.google.com/text-to-speech/pricing avant d'activer, les
-paliers gratuits pouvant changer.
+La voix est synthétisée par Google Cloud TTS. Contrairement à la clé
+Gemini, celle-ci nécessite un compte Google Cloud avec la facturation
+activée (carte bancaire enregistrée).
+
+- **Voix Neural2** (`fr-FR-Neural2-G`) : reste dans le palier gratuit tant
+  que le podcast ne dépasse pas quelques millions de caractères par mois
+  (largement suffisant pour un usage quotidien).
+- **Voix Studio** (`fr-FR-Studio-D`, utilisée actuellement — plus naturelle,
+  calibrée pour la narration) : **payante dès le premier caractère**, pas
+  de palier gratuit. Le réglage de tonalité (`voice_pitch`) ne s'applique
+  pas à cette famille de voix (limitation de l'API Google), seul le débit
+  (`voice_rate`) reste ajustable.
+
+Vérifie les tarifs actuels sur https://cloud.google.com/text-to-speech/pricing
+avant d'activer — ils peuvent changer. Avec une voix Studio payante,
+configure aussi une **alerte de budget** pour éviter toute mauvaise
+surprise : *Billing → Budgets & alerts → Create budget* sur ton projet
+Google Cloud, avec un seuil bas (quelques euros).
 
 1. Crée un projet sur https://console.cloud.google.com, active la
    facturation, puis active l'API *Cloud Text-to-Speech*
