@@ -147,7 +147,20 @@ def call_gemini(prompt):
     body = json.dumps(
         {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 1.0, "maxOutputTokens": 8192},
+            "generationConfig": {
+                "temperature": 1.0,
+                "maxOutputTokens": 8192,
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "title": {"type": "STRING"},
+                        "description": {"type": "STRING"},
+                        "script": {"type": "STRING"},
+                    },
+                    "required": ["title", "description", "script"],
+                },
+            },
         }
     ).encode("utf-8")
     req = urllib.request.Request(
@@ -156,9 +169,7 @@ def call_gemini(prompt):
     with urllib.request.urlopen(req, timeout=180) as r:
         data = json.load(r)
     text = data["candidates"][0]["content"]["parts"][0]["text"]
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
-    start, end = text.find("{"), text.rfind("}")
-    return json.loads(text[start : end + 1])
+    return json.loads(text)
 
 
 def clean_script(text):
