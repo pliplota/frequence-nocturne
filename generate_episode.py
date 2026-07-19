@@ -149,7 +149,12 @@ def call_gemini(prompt):
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 1.0,
-                "maxOutputTokens": 8192,
+                "maxOutputTokens": 16384,
+                # Pas besoin de raisonnement invisible pour de l'écriture
+                # créative — désactivé pour laisser tout le budget de tokens
+                # au texte visible (une réponse tronquée par MAX_TOKENS
+                # produit un JSON invalide en plein milieu d'une chaîne).
+                "thinkingConfig": {"thinkingBudget": 0},
                 "responseMimeType": "application/json",
                 "responseSchema": {
                     "type": "OBJECT",
@@ -168,7 +173,13 @@ def call_gemini(prompt):
     )
     with urllib.request.urlopen(req, timeout=180) as r:
         data = json.load(r)
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    candidate = data["candidates"][0]
+    if candidate.get("finishReason") == "MAX_TOKENS":
+        sys.exit(
+            "ERREUR : réponse Gemini tronquée (maxOutputTokens atteint) — "
+            "augmente maxOutputTokens dans call_gemini()."
+        )
+    text = candidate["content"]["parts"][0]["text"]
     return json.loads(text)
 
 
