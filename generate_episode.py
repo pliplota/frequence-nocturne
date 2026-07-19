@@ -197,7 +197,7 @@ def clean_script(text):
 # 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text, max_chars=2500):
+def chunk_text(text, max_chars=1200):
     """Découpe le texte en morceaux d'une taille raisonnable (Gemini TTS
     recommande des extraits de quelques minutes maximum pour la qualité),
     sans couper au milieu d'une phrase."""
@@ -257,7 +257,7 @@ def synthesize_chunk(text, api_key, out_path):
         url, data=body, headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=120) as r:
+        with urllib.request.urlopen(req, timeout=300) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         # Affiche le corps de la réponse d'erreur (urllib ne le montre pas
