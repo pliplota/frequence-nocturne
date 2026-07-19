@@ -242,10 +242,10 @@ def synthesize_chunk(text, api_key, out_path):
         "audioEncoding": "LINEAR16",
         "speakingRate": CONFIG.get("voice_rate", 0.92),
     }
-    if "Studio" not in voice_name:
-        # Les voix Studio de Google ne supportent pas le réglage de pitch
-        # (ni via SSML ni via audioConfig) — on ne l'envoie que pour les
-        # autres familles de voix (Neural2, Wavenet, etc.).
+    if "Studio" not in voice_name and "Chirp" not in voice_name:
+        # Les voix Studio et Chirp3 HD de Google ne supportent pas (ou pas
+        # de façon documentée) le réglage de pitch — on ne l'envoie que
+        # pour les autres familles de voix (Neural2, Wavenet, etc.).
         audio_config["pitch"] = CONFIG.get("voice_pitch", -2.0)
 
     url = "https://texttospeech.googleapis.com/v1/text:synthesize?key=" + api_key
