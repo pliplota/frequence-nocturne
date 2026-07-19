@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import wave
 
@@ -232,38 +233,56 @@ def synthesize_chunk(text, api_key, out_path):
         "présentateur de radio de nuit, avec de courtes pauses naturelles "
         "aux points de suspension et aux tirets d'incise :",
     )
-    url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+    model = CONFIG.get("tts_model", "gemini-2.5-flash-preview-tts")
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={api_key}"
+    )
     body = json.dumps(
         {
-            "model": CONFIG.get("tts_model", "gemini-3.1-flash-tts-preview"),
-            "input": f"{style} {text}",
-            "response_format": {"type": "audio"},
-            "generation_config": {
-                "speech_config": [{"voice": CONFIG.get("voice", "Charon")}]
+            "contents": [{"parts": [{"text": f"{style} {text}"}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {
+                    "voiceConfig": {
+                        "prebuiltVoiceConfig": {
+                            "voiceName": CONFIG.get("voice", "Charon")
+                        }
+                    }
+                },
             },
         }
     ).encode("utf-8")
     req = urllib.request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        url, data=body, headers={"Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.load(r)
     try:
-        audio_b64 = data["output_audio"]["data"]
-    except (KeyError, TypeError):
-        # Le format exact de la réponse de cette API (preview) n'est pas
-        # documenté publiquement — si la structure ne correspond pas à ce
-        # qu'on attend, on affiche la réponse brute pour diagnostiquer vite
-        # plutôt que de planter avec un KeyError opaque.
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.load(r)
+    except urllib.error.HTTPError as e:
+        # Affiche le corps de la réponse d'erreur (urllib ne le montre pas
+        # par défaut) pour diagnostiquer directement au lieu de deviner à
+        # l'aveugle depuis une simple capture d'écran.
+        sys.exit(
+            f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n"
+            + e.read().decode("utf-8", errors="replace")[:2000]
+        )
+    try:
+        part = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+        audio_b64 = part["data"]
+        mime_type = part.get("mimeType", "")
+    except (KeyError, IndexError, TypeError):
         sys.exit(
             "ERREUR : réponse Gemini TTS inattendue, structure reçue :\n"
             + json.dumps(data, ensure_ascii=False)[:2000]
         )
     raw = base64.b64decode(audio_b64)
-    if not raw.startswith(b"RIFF"):
-        raw = _pcm_to_wav_bytes(raw)
+    if raw.startswith(b"RIFF"):
+        pass
+    else:
+        rate_match = re.search(r"rate=(\d+)", mime_type)
+        sample_rate = int(rate_match.group(1)) if rate_match else 24000
+        raw = _pcm_to_wav_bytes(raw, sample_rate=sample_rate)
     with open(out_path, "wb") as f:
         f.write(raw)
 
