@@ -197,7 +197,7 @@ def clean_script(text):
 # 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text, max_chars=6000):
+def chunk_text(text, max_chars=3000):
     """Découpe le texte en morceaux d'une taille raisonnable (Gemini TTS
     recommande des extraits de quelques minutes maximum pour la qualité),
     sans couper au milieu d'une phrase."""
@@ -226,7 +226,12 @@ def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
     return buf.getvalue()
 
 
-def synthesize_chunk(text, api_key, out_path):
+class TTSRetryableError(Exception):
+    """Échec probablement transitoire (finishReason != STOP, contenu vide) —
+    vaut le coup de réessayer avant d'abandonner."""
+
+
+def _request_tts(text, api_key):
     style = CONFIG.get(
         "tts_style_prompt",
         "Lis ce texte à voix haute d'un ton calme, posé et mesuré, comme un "
@@ -267,15 +272,42 @@ def synthesize_chunk(text, api_key, out_path):
             f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n"
             + e.read().decode("utf-8", errors="replace")[:2000]
         )
+
+    candidate = (data.get("candidates") or [{}])[0]
+    finish_reason = candidate.get("finishReason")
     try:
-        part = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+        part = candidate["content"]["parts"][0]["inlineData"]
         audio_b64 = part["data"]
         mime_type = part.get("mimeType", "")
     except (KeyError, IndexError, TypeError):
+        if finish_reason and finish_reason != "STOP":
+            # Glitch connu du modèle preview sur les générations longues :
+            # candidatesTokenCount non nul mais content vide, finishReason
+            # "OTHER" — transitoire dans les cas observés, vaut le coup
+            # de réessayer plutôt que d'abandonner direct.
+            raise TTSRetryableError(
+                f"finishReason={finish_reason}, content vide : "
+                + json.dumps(data, ensure_ascii=False)[:500]
+            )
         sys.exit(
             "ERREUR : réponse Gemini TTS inattendue, structure reçue :\n"
             + json.dumps(data, ensure_ascii=False)[:2000]
         )
+    return audio_b64, mime_type
+
+
+def synthesize_chunk(text, api_key, out_path, max_attempts=3):
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            audio_b64, mime_type = _request_tts(text, api_key)
+            break
+        except TTSRetryableError as e:
+            last_error = e
+            print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai)")
+    else:
+        sys.exit(f"ERREUR : Gemini TTS a échoué {max_attempts} fois de suite : {last_error}")
+
     raw = base64.b64decode(audio_b64)
     if raw.startswith(b"RIFF"):
         pass
