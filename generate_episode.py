@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import wave
@@ -227,8 +228,12 @@ def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
 
 
 class TTSRetryableError(Exception):
-    """Échec probablement transitoire (finishReason != STOP, contenu vide) —
-    vaut le coup de réessayer avant d'abandonner."""
+    """Échec probablement transitoire (finishReason != STOP avec contenu
+    vide, ou erreur HTTP temporaire côté serveur) — vaut le coup de
+    réessayer avant d'abandonner."""
+
+
+RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
 
 
 def _request_tts(text, api_key):
@@ -268,10 +273,12 @@ def _request_tts(text, api_key):
         # Affiche le corps de la réponse d'erreur (urllib ne le montre pas
         # par défaut) pour diagnostiquer directement au lieu de deviner à
         # l'aveugle depuis une simple capture d'écran.
-        sys.exit(
-            f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n"
-            + e.read().decode("utf-8", errors="replace")[:2000]
-        )
+        body = e.read().decode("utf-8", errors="replace")
+        if e.code in RETRYABLE_HTTP_CODES:
+            # Erreur serveur temporaire (surcharge, rate limit...) : vaut
+            # le coup de réessayer plutôt qu'abandonner direct.
+            raise TTSRetryableError(f"HTTP {e.code} : {body[:500]}")
+        sys.exit(f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n" + body[:2000])
 
     candidate = (data.get("candidates") or [{}])[0]
     finish_reason = candidate.get("finishReason")
@@ -296,7 +303,7 @@ def _request_tts(text, api_key):
     return audio_b64, mime_type
 
 
-def synthesize_chunk(text, api_key, out_path, max_attempts=3):
+def synthesize_chunk(text, api_key, out_path, max_attempts=4):
     last_error = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -304,7 +311,10 @@ def synthesize_chunk(text, api_key, out_path, max_attempts=3):
             break
         except TTSRetryableError as e:
             last_error = e
-            print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai)")
+            if attempt < max_attempts:
+                wait = 10 * attempt  # 10s, 20s, 30s...
+                print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai dans {wait}s)")
+                time.sleep(wait)
     else:
         sys.exit(f"ERREUR : Gemini TTS a échoué {max_attempts} fois de suite : {last_error}")
 
