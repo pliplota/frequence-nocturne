@@ -198,7 +198,7 @@ def clean_script(text):
 # 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text, max_chars=1500):
+def chunk_text(text, max_chars=700):
     """Découpe le texte en morceaux d'une taille raisonnable (Gemini TTS
     recommande des extraits de quelques minutes maximum pour la qualité),
     sans couper au milieu d'une phrase."""
