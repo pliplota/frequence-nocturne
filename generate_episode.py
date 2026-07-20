@@ -319,6 +319,45 @@ def synthesize_chunk(text, api_key, out_path, max_attempts=3):
         f.write(raw)
 
 
+def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.3):
+    """Assemble les morceaux avec un court fondu enchaîné à chaque jointure
+    plutôt qu'une coupure nette — atténue la perception des changements de
+    ton/énergie entre deux générations indépendantes du modèle."""
+    if len(part_paths) == 1:
+        subprocess.check_call(
+            [
+                "ffmpeg", "-y", "-i", part_paths[0],
+                "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", out_path,
+            ]
+        )
+        return
+
+    cmd = ["ffmpeg", "-y"]
+    for p in part_paths:
+        cmd += ["-i", p]
+
+    filters = []
+    for i in range(len(part_paths)):
+        # Format uniforme avant le fondu : les morceaux peuvent différer
+        # légèrement de sample rate/canaux selon la réponse de l'API.
+        filters.append(f"[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo[n{i}]")
+    prev_label = "n0"
+    for i in range(1, len(part_paths)):
+        out_label = f"cf{i}" if i < len(part_paths) - 1 else "mixout"
+        filters.append(
+            f"[{prev_label}][n{i}]acrossfade=d={crossfade_duration}:c1=tri:c2=tri[{out_label}]"
+        )
+        prev_label = out_label
+
+    cmd += [
+        "-filter_complex", ";".join(filters),
+        "-map", "[mixout]",
+        "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100",
+        out_path,
+    ]
+    subprocess.check_call(cmd)
+
+
 def synthesize(text, out_path):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -326,18 +365,12 @@ def synthesize(text, out_path):
 
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
-        list_path = os.path.join(tmp_dir, "list.txt")
-        with open(list_path, "w", encoding="utf-8") as list_file:
-            for i, chunk in enumerate(chunk_text(text)):
-                part_path = os.path.join(tmp_dir, f"part_{i:03d}.wav")
-                synthesize_chunk(chunk, api_key, part_path)
-                list_file.write(f"file '{part_path}'\n")
-        subprocess.check_call(
-            [
-                "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_path,
-                "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100", out_path,
-            ]
-        )
+        part_paths = []
+        for i, chunk in enumerate(chunk_text(text)):
+            part_path = os.path.join(tmp_dir, f"part_{i:03d}.wav")
+            synthesize_chunk(chunk, api_key, part_path)
+            part_paths.append(part_path)
+        _concat_with_crossfade(part_paths, out_path)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
