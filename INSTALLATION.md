@@ -33,6 +33,16 @@ comportement (nom exact, disponibilité) peut changer sans préavis côté
 Google. Vérifie ton tableau de bord AI Studio si tu as un doute sur la
 facturation.
 
+⚠️ **Quota très restreint** (constaté en pratique) : 10 requêtes/minute
+et **100 requêtes/jour** pour ce modèle. Chaque épisode fait plusieurs
+requêtes (`chunk_text` découpe le script en morceaux, une requête par
+morceau — voir le champ `voice`/`tts_model` et la fonction `chunk_text`
+dans `generate_episode.py`). Avec deux créneaux automatiques par jour,
+mieux vaut garder peu de morceaux par épisode (~8-10) pour laisser de
+la marge à des tests manuels ; un découpage trop fin (ex. phrase par
+phrase) épuise le quota du jour en un seul épisode, avec un délai de
+récupération pouvant aller jusqu'à ~24h.
+
 ## 3. Ajouter ta musique et la pochette
 
 - Mets ta musique d'ambiance dans `music/ambiance.mp3`
