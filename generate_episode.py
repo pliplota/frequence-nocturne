@@ -198,12 +198,27 @@ def clean_script(text):
 # 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text):
-    """Chaque phrase est synthétisée indépendamment. Plus lent (beaucoup
-    plus d'appels API) et plus de coutures à absorber par le fondu
-    enchaîné, mais laisse le minimum de temps possible à une dérive de
-    ton en cours de génération."""
-    return [s for s in re.split(r"(?<=[.!?…])\s+", text.strip()) if s]
+def chunk_text(text, max_chars=1500):
+    """Découpe le texte en morceaux, sans couper au milieu d'une phrase.
+    gemini-3.1-flash-tts-preview a un quota très restreint (10 req/min,
+    100 req/jour au moment où c'est écrit) — la génération phrase par
+    phrase (~240 requêtes/épisode) l'épuise en un seul épisode. Ce
+    réglage vise ~8-10 morceaux par épisode complet, un compromis entre
+    limiter la dérive de ton et rester dans un budget de requêtes
+    soutenable pour deux créneaux quotidiens + des tests manuels."""
+    sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
+    chunks = []
+    current = ""
+    for sentence in sentences:
+        candidate = f"{current} {sentence}".strip() if current else sentence
+        if current and len(candidate) > max_chars:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
@@ -263,6 +278,15 @@ def _request_tts(text, api_key):
         # par défaut) pour diagnostiquer directement au lieu de deviner à
         # l'aveugle depuis une simple capture d'écran.
         body = e.read().decode("utf-8", errors="replace")
+        if e.code == 429 and "per_day" in body:
+            # Quota QUOTIDIEN épuisé (pas juste la limite par minute) :
+            # le message donne un délai de réessai en heures, ça ne sert
+            # à rien d'insister dans ce run.
+            sys.exit(
+                "ERREUR : quota quotidien Gemini TTS épuisé — réessaie plus "
+                "tard (le message d'erreur indique dans combien de temps) :\n"
+                + body[:1500]
+            )
         if e.code in RETRYABLE_HTTP_CODES:
             # Erreur serveur temporaire (surcharge, rate limit...) : vaut
             # le coup de réessayer plutôt qu'abandonner direct.
@@ -374,6 +398,10 @@ def synthesize(text, out_path):
     try:
         part_paths = []
         for i, chunk in enumerate(chunk_text(text)):
+            if i > 0:
+                # Respecte la limite de 10 requêtes/minute du modèle preview
+                # (7s de marge entre appels -> ~8,5 req/min).
+                time.sleep(7)
             part_path = os.path.join(tmp_dir, f"part_{i:03d}.wav")
             synthesize_chunk(chunk, api_key, part_path)
             part_paths.append(part_path)
