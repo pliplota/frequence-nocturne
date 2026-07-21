@@ -198,23 +198,12 @@ def clean_script(text):
 # 2. Synthèse vocale (Gemini TTS — voix native, contrôlée par prompt)
 # ---------------------------------------------------------------------------
 
-def chunk_text(text, max_chars=700):
-    """Découpe le texte en morceaux d'une taille raisonnable (Gemini TTS
-    recommande des extraits de quelques minutes maximum pour la qualité),
-    sans couper au milieu d'une phrase."""
-    sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
-    chunks = []
-    current = ""
-    for sentence in sentences:
-        candidate = f"{current} {sentence}".strip() if current else sentence
-        if current and len(candidate) > max_chars:
-            chunks.append(current)
-            current = sentence
-        else:
-            current = candidate
-    if current:
-        chunks.append(current)
-    return chunks
+def chunk_text(text):
+    """Chaque phrase est synthétisée indépendamment. Plus lent (beaucoup
+    plus d'appels API) et plus de coutures à absorber par le fondu
+    enchaîné, mais laisse le minimum de temps possible à une dérive de
+    ton en cours de génération."""
+    return [s for s in re.split(r"(?<=[.!?…])\s+", text.strip()) if s]
 
 
 def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
@@ -329,7 +318,7 @@ def synthesize_chunk(text, api_key, out_path, max_attempts=4):
         f.write(raw)
 
 
-def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.3):
+def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
     """Assemble les morceaux avec un court fondu enchaîné à chaque jointure
     plutôt qu'une coupure nette — atténue la perception des changements de
     ton/énergie entre deux générations indépendantes du modèle."""
@@ -359,8 +348,16 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.3):
         )
         prev_label = out_label
 
+    # Avec beaucoup de morceaux (génération phrase par phrase), le graphe de
+    # filtres est trop long pour tenir en argument de ligne de commande —
+    # on le passe par fichier (-filter_complex_script) pour rester dans les
+    # limites du système, quel que soit le nombre de morceaux.
+    script_path = os.path.join(os.path.dirname(part_paths[0]), "_filter_complex.txt")
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(";".join(filters))
+
     cmd += [
-        "-filter_complex", ";".join(filters),
+        "-filter_complex_script", script_path,
         "-map", "[mixout]",
         "-c:a", "libmp3lame", "-b:a", "128k", "-ar", "44100",
         out_path,
