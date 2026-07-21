@@ -449,13 +449,23 @@ def mix(voice_path, out_path):
         cmd += ["-i", GENERIQUE_OUTRO]
         outro_idx, idx = idx, idx + 1
 
+    # dynaudnorm lisse les écarts de volume de la voix (utile tant que la
+    # synthèse dérive parfois vers un ton plus doux/chuchoté en cours de
+    # génération) — remonte les passages trop bas plutôt que d'appliquer
+    # un simple gain fixe.
+    voice_filter = "dynaudnorm=f=200:g=15:m=20"
+
     filters = []
     if have_music:
-        filters.append(f"[0:a]adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[v]")
+        filters.append(
+            f"[0:a]{voice_filter},adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[v]"
+        )
         filters.append(f"[{music_idx}:a]volume={vol}[m]")
         filters.append("[v][m]amix=inputs=2:duration=first:dropout_transition=4[bedraw]")
     else:
-        filters.append(f"[0:a]adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[bedraw]")
+        filters.append(
+            f"[0:a]{voice_filter},adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[bedraw]"
+        )
     filters.append(
         f"[bedraw]afade=t=in:st=0:d=2,afade=t=out:st={total-5:.2f}:d=5,"
         f"aformat=sample_rates=44100:channel_layouts=stereo[bed]"
