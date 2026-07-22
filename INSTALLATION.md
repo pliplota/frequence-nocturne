@@ -37,11 +37,12 @@ facturation.
 et **100 requêtes/jour** pour ce modèle. Chaque épisode fait plusieurs
 requêtes (`chunk_text` découpe le script en morceaux, une requête par
 morceau — voir le champ `voice`/`tts_model` et la fonction `chunk_text`
-dans `generate_episode.py`). Avec deux créneaux automatiques par jour,
-mieux vaut garder peu de morceaux par épisode (~8-10) pour laisser de
-la marge à des tests manuels ; un découpage trop fin (ex. phrase par
-phrase) épuise le quota du jour en un seul épisode, avec un délai de
-récupération pouvant aller jusqu'à ~24h.
+dans `generate_episode.py`). Un seul créneau automatique par jour (le
+soir) pour économiser ce quota ; garder peu de morceaux par épisode
+(~8-10) laisse quand même de la marge pour des tests manuels dans la
+journée. Un découpage trop fin (ex. phrase par phrase) épuise le quota
+du jour en un seul épisode, avec un délai de récupération pouvant aller
+jusqu'à ~24h — vécu en pratique, pas juste théorique.
 
 ## 3. Ajouter ta musique et la pochette
 
@@ -93,11 +94,11 @@ Deux minutes plus tard, vérifie que `docs/feed.xml` et
    que tu consultes vraiment).
 3. Valide. L'émission apparaît sous quelques heures.
 
-Ensuite : **deux épisodes sont générés et poussés automatiquement chaque
-jour** — un vers 5h30 (prêt pour le matin) et un vers 18h30 (prêt avant
-20h00). **Spotify les récupère automatiquement**, avec le même délai de
-rafraîchissement à chaque fois (la publication pile à l'heure n'est pas
-garantissable à la minute près).
+Ensuite : **un épisode est généré et poussé automatiquement chaque jour**,
+vers 18h30 (prêt avant 20h00). **Spotify le récupère automatiquement**
+(la publication pile à l'heure n'est pas garantissable à la minute près).
+Tu peux toujours en générer d'autres à la main avec le bouton, dans la
+limite du quota quotidien de l'API vocale.
 
 Le même flux RSS peut aussi être déclaré sur Apple Podcasts, Deezer,
 Amazon Music, etc.
@@ -107,22 +108,19 @@ Amazon Music, etc.
 ## Bon à savoir
 
 - **Retard possible du cron** : GitHub lance les tâches planifiées avec
-  parfois 5-30 min de retard. D'où les déclenchements à 5h30 et 18h30
-  plutôt que pile à l'heure visée (7h00 et 20h00).
-- **Heure d'hiver** : le cron est en UTC ; en hiver les épisodes partiront
-  à 4h30 et 17h30 au lieu de 5h30 et 18h30. Aucun impact, ils seront juste
-  prêts plus tôt.
-- **Deux créneaux distincts** : le créneau du matin (cron `30 3 * * *`)
-  produit `AAAA-MM-JJ.mp3` ; celui du soir (cron `30 16 * * *`) produit
-  `AAAA-MM-JJ-soir.mp3`. Chacun ne se génère qu'une fois par jour — la
-  correspondance cron → suffixe est dans `SCHEDULE_SLOTS` en haut de
-  `generate_episode.py`, à ajuster si tu changes les horaires.
-- **Poids du dépôt** : ~7-13 Mo par épisode, deux épisodes par jour, soit
-  ~5-9 Go/an. GitHub tolère jusqu'à ~5 Go. Il faudra donc archiver les
-  vieux épisodes ailleurs (archive.org) ou passer sur un hébergeur de
-  podcast gratuit (le flux RSS reste le même principe) plus tôt qu'avec
-  un seul épisode quotidien — probablement en cours d'année plutôt
-  qu'au bout d'un an.
+  parfois 5-30 min de retard. D'où le déclenchement à 18h30 plutôt que
+  pile à l'heure visée (20h00).
+- **Heure d'hiver** : le cron est en UTC ; en hiver l'épisode partira à
+  17h30 au lieu de 18h30. Aucun impact, il sera juste prêt plus tôt.
+- **Un seul créneau automatique** (le soir, cron `30 16 * * *`, retiré
+  du matin pour économiser le quota quotidien de l'API vocale) —
+  produit `AAAA-MM-JJ-soir.mp3`. La correspondance cron → suffixe est
+  dans `SCHEDULE_SLOTS` en haut de `generate_episode.py`, à ajuster si
+  tu changes les horaires ou réactives un second créneau.
+- **Poids du dépôt** : ~7-13 Mo par épisode. GitHub tolère jusqu'à
+  ~5 Go. Il faudra archiver les vieux épisodes ailleurs (archive.org)
+  ou passer sur un hébergeur de podcast gratuit (le flux RSS reste le
+  même principe) au bout d'un moment.
 - **Épisode manuel** : onglet *Actions → Run workflow* à tout moment.
 - **Modifier le style des histoires** : tout le "prompt" d'écriture est
   dans `generate_episode.py`, fonction `build_prompt` — les thèmes sont
