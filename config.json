@@ -5,7 +5,7 @@
   "presenter_name": "Antoine Mercier",
   "contact_email": "frequencenocturne@proton.me",
   "language": "fr",
-  "tts_provider": "elevenlabs",
+  "tts_provider": "gemini",
   "voice": "Orus",
   "tts_model": "gemini-3.1-flash-tts-preview",
   "tts_style_prompt": "Style : lecture à voix haute pour un enregistrement officiel, comme un greffier qui lit des dépositions de témoins au tribunal — voix ferme, articulée, neutre et professionnelle, volume normal et constant du début à la fin, sans aucune inflexion dramatique. Aucune dimension effrayante, mystérieuse ou intime dans la voix elle-même : le contenu parle de lui-même, la lecture reste factuelle et détachée, comme n'importe quel autre document lu à voix haute. Ne jamais chuchoter, murmurer, ni baisser le ton — même légèrement, même sur les passages étranges du texte. Lis ce texte :",
