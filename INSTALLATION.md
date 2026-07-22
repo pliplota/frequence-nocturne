@@ -44,6 +44,32 @@ journée. Un découpage trop fin (ex. phrase par phrase) épuise le quota
 du jour en un seul épisode, avec un délai de récupération pouvant aller
 jusqu'à ~24h — vécu en pratique, pas juste théorique.
 
+## 2bis. Alternative voix : ElevenLabs
+
+Si le quota Gemini TTS est trop restrictif, `config.json` permet de
+basculer vers ElevenLabs à la place (`tts_provider": "elevenlabs"`).
+Pas de quota par minute/jour aussi sévère, mais **facturé au caractère,
+palier gratuit très limité** : 10 000 caractères/mois (~7-8 min audio,
+usage non commercial uniquement) — un seul épisode (~10-13 000
+caractères) épuise quasiment tout le quota *mensuel* gratuit. Pour un
+épisode/jour, compte un palier payant (Starter 30k car./mois à 5 $,
+Creator 100k à 22 $, etc. — vérifie les tarifs actuels sur
+elevenlabs.io/pricing).
+
+1. Crée un compte sur https://elevenlabs.io, récupère ta clé API
+   (*Profile → API Keys*).
+2. Dans le dépôt : *Settings → Secrets and variables → Actions → New
+   repository secret*. Nom : `ELEVENLABS_API_KEY` — Valeur : ta clé.
+3. Dans `config.json` : `"tts_provider": "elevenlabs"`, et ajuste
+   `elevenlabs_voice_id` (parcours la bibliothèque de voix sur
+   elevenlabs.io pour trouver l'ID qui te convient — celui fourni par
+   défaut est un choix arbitraire, à vérifier/remplacer),
+   `elevenlabs_model` (par défaut `eleven_multilingual_v2`, compatible
+   français) et `elevenlabs_voice_settings` (`stability`,
+   `similarity_boost`, `speed` — pas de consigne en langage naturel
+   comme pour Gemini TTS, tout se règle par ces valeurs numériques ;
+   `tts_style_prompt` est ignoré pour ce fournisseur).
+
 ## 3. Ajouter ta musique et la pochette
 
 - Mets ta musique d'ambiance dans `music/ambiance.mp3`

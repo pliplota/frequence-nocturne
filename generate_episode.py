@@ -240,7 +240,21 @@ class TTSRetryableError(Exception):
 RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
 
 
-def _request_tts(text, api_key):
+def _with_retries(request_fn, label, max_attempts=4):
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return request_fn()
+        except TTSRetryableError as e:
+            last_error = e
+            if attempt < max_attempts:
+                wait = 10 * attempt  # 10s, 20s, 30s...
+                print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai dans {wait}s)")
+                time.sleep(wait)
+    sys.exit(f"ERREUR : {label} a échoué {max_attempts} fois de suite : {last_error}")
+
+
+def _request_tts_gemini(text, api_key):
     style = CONFIG.get(
         "tts_style_prompt",
         "Lis ce texte à voix haute d'un ton calme, posé et mesuré, comme un "
@@ -316,30 +330,50 @@ def _request_tts(text, api_key):
     return audio_b64, mime_type
 
 
-def synthesize_chunk(text, api_key, out_path, max_attempts=4):
-    last_error = None
-    for attempt in range(1, max_attempts + 1):
-        try:
-            audio_b64, mime_type = _request_tts(text, api_key)
-            break
-        except TTSRetryableError as e:
-            last_error = e
-            if attempt < max_attempts:
-                wait = 10 * attempt  # 10s, 20s, 30s...
-                print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai dans {wait}s)")
-                time.sleep(wait)
-    else:
-        sys.exit(f"ERREUR : Gemini TTS a échoué {max_attempts} fois de suite : {last_error}")
-
+def synthesize_chunk_gemini(text, api_key, out_path):
+    audio_b64, mime_type = _with_retries(
+        lambda: _request_tts_gemini(text, api_key), "Gemini TTS"
+    )
     raw = base64.b64decode(audio_b64)
-    if raw.startswith(b"RIFF"):
-        pass
-    else:
+    if not raw.startswith(b"RIFF"):
         rate_match = re.search(r"rate=(\d+)", mime_type)
         sample_rate = int(rate_match.group(1)) if rate_match else 24000
         raw = _pcm_to_wav_bytes(raw, sample_rate=sample_rate)
     with open(out_path, "wb") as f:
         f.write(raw)
+
+
+def _request_tts_elevenlabs(text, api_key):
+    voice_id = CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+    model_id = CONFIG.get("elevenlabs_model", "eleven_multilingual_v2")
+    voice_settings = CONFIG.get(
+        "elevenlabs_voice_settings",
+        {"stability": 0.6, "similarity_boost": 0.75, "speed": 0.92},
+    )
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    body = json.dumps(
+        {"text": text, "model_id": model_id, "voice_settings": voice_settings}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/json", "xi-api-key": api_key},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code in RETRYABLE_HTTP_CODES:
+            raise TTSRetryableError(f"HTTP {e.code} : {body_text[:500]}")
+        sys.exit(f"ERREUR HTTP {e.code} de l'API ElevenLabs :\n" + body_text[:2000])
+
+
+def synthesize_chunk_elevenlabs(text, api_key, out_path):
+    audio_bytes = _with_retries(
+        lambda: _request_tts_elevenlabs(text, api_key), "ElevenLabs"
+    )
+    with open(out_path, "wb") as f:
+        f.write(audio_bytes)
 
 
 def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
@@ -390,20 +424,36 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
 
 
 def synthesize(text, out_path):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
+    provider = CONFIG.get("tts_provider", "gemini")
+    if provider == "gemini":
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
+        synth_fn, ext = synthesize_chunk_gemini, "wav"
+        # Respecte la limite de 10 requêtes/minute du modèle preview
+        # (7s de marge entre appels -> ~8,5 req/min). ElevenLabs n'a pas
+        # ce genre de quota restrictif, donc pas de pause pour ce fournisseur.
+        pace_seconds = 7
+    elif provider == "elevenlabs":
+        api_key = os.environ.get("ELEVENLABS_API_KEY")
+        if not api_key:
+            sys.exit("ERREUR : variable d'environnement ELEVENLABS_API_KEY absente.")
+        synth_fn, ext = synthesize_chunk_elevenlabs, "mp3"
+        pace_seconds = 0
+    else:
+        sys.exit(
+            f"ERREUR : tts_provider inconnu dans config.json : {provider!r} "
+            "(attendu 'gemini' ou 'elevenlabs')."
+        )
 
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
         part_paths = []
         for i, chunk in enumerate(chunk_text(text)):
-            if i > 0:
-                # Respecte la limite de 10 requêtes/minute du modèle preview
-                # (7s de marge entre appels -> ~8,5 req/min).
-                time.sleep(7)
-            part_path = os.path.join(tmp_dir, f"part_{i:03d}.wav")
-            synthesize_chunk(chunk, api_key, part_path)
+            if i > 0 and pace_seconds:
+                time.sleep(pace_seconds)
+            part_path = os.path.join(tmp_dir, f"part_{i:03d}.{ext}")
+            synth_fn(chunk, api_key, part_path)
             part_paths.append(part_path)
         _concat_with_crossfade(part_paths, out_path)
     finally:
@@ -596,7 +646,7 @@ def main():
     script = clean_script(ep_data["script"].strip())
     print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
 
-    print("2/4  Synthèse vocale (Gemini TTS)…")
+    print(f"2/4  Synthèse vocale ({CONFIG.get('tts_provider', 'gemini')})…")
     voice_path = os.path.join(ROOT, "voice_tmp.mp3")
     synthesize(script, voice_path)
 
