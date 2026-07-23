@@ -233,7 +233,10 @@ def chunk_text(text, max_chars=1500):
     phrase (~240 requêtes/épisode) l'épuise en un seul épisode. Ce
     réglage vise ~8-10 morceaux par épisode complet, un compromis entre
     limiter la dérive de ton et rester dans un budget de requêtes
-    soutenable pour deux créneaux quotidiens + des tests manuels."""
+    soutenable pour deux créneaux quotidiens + des tests manuels. Même
+    logique côté coût pour un fournisseur payant comme OpenAI : moins de
+    requêtes, moins de risque de reproduire une explosion du nombre
+    d'appels (voir MAX_TTS_CHUNKS plus bas)."""
     sentences = re.split(r"(?<=[.!?…])\s+", text.strip())
     chunks = []
     current = ""
@@ -413,6 +416,46 @@ def synthesize_chunk_elevenlabs(text, api_key, out_path):
         f.write(audio_bytes)
 
 
+def _request_tts_openai(text, api_key):
+    model = CONFIG.get("openai_tts_model", "gpt-4o-mini-tts")
+    voice = CONFIG.get("openai_voice", "onyx")
+    instructions = CONFIG.get(
+        "openai_voice_instructions",
+        "Voix grave et posée de présentateur radio de nuit. Volume et débit "
+        "constants du début à la fin, jamais de chuchotement ni de baisse "
+        "de volume, même sur les passages les plus intimistes.",
+    )
+    url = "https://api.openai.com/v1/audio/speech"
+    payload = {"model": model, "voice": voice, "input": text, "response_format": "mp3"}
+    # tts-1 / tts-1-hd ne comprennent pas "instructions" (spécifique à
+    # gpt-4o-mini-tts) — ne l'envoyer que pour ce modèle.
+    if model == "gpt-4o-mini-tts" and instructions:
+        payload["instructions"] = instructions
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code in RETRYABLE_HTTP_CODES:
+            raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
+        sys.exit(f"ERREUR HTTP {e.code} de l'API OpenAI TTS :\n" + body_text[:2000])
+    except NETWORK_ERRORS as e:
+        raise RetryableError(f"{type(e).__name__} : {e}")
+
+
+def synthesize_chunk_openai(text, api_key, out_path):
+    audio_bytes = _with_retries(
+        lambda: _request_tts_openai(text, api_key), "OpenAI TTS"
+    )
+    with open(out_path, "wb") as f:
+        f.write(audio_bytes)
+
+
 def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
     """Assemble les morceaux avec un court fondu enchaîné à chaque jointure
     plutôt qu'une coupure nette — atténue la perception des changements de
@@ -460,33 +503,65 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
     subprocess.check_call(cmd)
 
 
+# Chien de garde anti-explosion de requêtes : un épisode normal tient en
+# ~8-10 morceaux. Si un futur changement de réglage (max_chars trop petit,
+# régression du découpage...) en produit brutalement beaucoup plus — comme
+# le découpage phrase par phrase qui avait généré ~240 requêtes et épuisé
+# le quota Gemini en un seul épisode — on préfère échouer bruyamment AVANT
+# d'appeler l'API plutôt que de cramer un budget de requêtes (quota ou,
+# pire, crédits payants OpenAI/ElevenLabs) sans s'en rendre compte.
+MAX_TTS_CHUNKS = 20
+
+
 def synthesize(text, out_path):
     provider = CONFIG.get("tts_provider", "gemini")
     if provider == "gemini":
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
-        synth_fn, ext = synthesize_chunk_gemini, "wav"
+        synth_fn, ext, max_chars = synthesize_chunk_gemini, "wav", 1500
         # Respecte la limite de 10 requêtes/minute du modèle preview
-        # (7s de marge entre appels -> ~8,5 req/min). ElevenLabs n'a pas
-        # ce genre de quota restrictif, donc pas de pause pour ce fournisseur.
+        # (7s de marge entre appels -> ~8,5 req/min). ElevenLabs et OpenAI
+        # n'ont pas ce genre de quota restrictif, donc pas de pause pour
+        # ces fournisseurs.
         pace_seconds = 7
     elif provider == "elevenlabs":
         api_key = os.environ.get("ELEVENLABS_API_KEY")
         if not api_key:
             sys.exit("ERREUR : variable d'environnement ELEVENLABS_API_KEY absente.")
-        synth_fn, ext = synthesize_chunk_elevenlabs, "mp3"
+        synth_fn, ext, max_chars = synthesize_chunk_elevenlabs, "mp3", 1500
+        pace_seconds = 0
+    elif provider == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            sys.exit("ERREUR : variable d'environnement OPENAI_API_KEY absente.")
+        # Fournisseur payant à l'usage (pas de raison de tenir au ton comme
+        # pour Gemini) : des morceaux plus larges (proche de la limite de
+        # 4096 caractères de l'API) veulent dire moins de requêtes, donc
+        # moins de risque de coût, pour le même texte total.
+        synth_fn, ext, max_chars = synthesize_chunk_openai, "mp3", 3800
         pace_seconds = 0
     else:
         sys.exit(
             f"ERREUR : tts_provider inconnu dans config.json : {provider!r} "
-            "(attendu 'gemini' ou 'elevenlabs')."
+            "(attendu 'gemini', 'elevenlabs' ou 'openai')."
         )
+
+    chunks = chunk_text(text, max_chars=max_chars)
+    if len(chunks) > MAX_TTS_CHUNKS:
+        sys.exit(
+            f"ERREUR : découpage en {len(chunks)} morceaux pour la synthèse "
+            f"{provider} — au-delà du plafond de sécurité ({MAX_TTS_CHUNKS}). "
+            "Aucune requête envoyée. Vérifie chunk_text()/max_chars avant de "
+            "relancer : c'est probablement une régression du découpage, pas "
+            "un texte légitimement 20x plus long que d'habitude."
+        )
+    print(f"     ({len(chunks)} requête(s) {provider})")
 
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
         part_paths = []
-        for i, chunk in enumerate(chunk_text(text)):
+        for i, chunk in enumerate(chunks):
             if i > 0 and pace_seconds:
                 time.sleep(pace_seconds)
             part_path = os.path.join(tmp_dir, f"part_{i:03d}.{ext}")
