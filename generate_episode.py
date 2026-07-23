@@ -180,7 +180,7 @@ def _request_gemini_text(prompt, api_key):
         url, data=body, headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
+        with urllib.request.urlopen(req, timeout=90) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         # Ce même genre d'erreur transitoire (429/503...) qui frappait la
@@ -268,7 +268,7 @@ class RetryableError(Exception):
 RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
 
 
-def _with_retries(request_fn, label, max_attempts=4):
+def _with_retries(request_fn, label, max_attempts=5):
     last_error = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -318,7 +318,7 @@ def _request_tts_gemini(text, api_key):
         url, data=body, headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=300) as r:
+        with urllib.request.urlopen(req, timeout=90) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         # Affiche le corps de la réponse d'erreur (urllib ne le montre pas
