@@ -8,7 +8,7 @@
   "tts_provider": "gemini",
   "voice": "Charon",
   "tts_model": "gemini-3.1-flash-tts-preview",
-  "tts_style_prompt": "Lis ce texte à voix haute comme un présentateur de radio qui s'adresse clairement à son auditoire, d'un ton calme et posé mais avec un volume de voix normal, projeté, du début à la fin — jamais un chuchotement, jamais un murmure, jamais une baisse progressive d'intensité. Imagine que tu parles dans un micro de studio à distance normale, pas à l'oreille de quelqu'un. De courtes pauses naturelles aux points de suspension et aux tirets d'incise suffisent à créer l'atmosphère, pas besoin de baisser la voix :",
+  "tts_style_prompt": "Voix ferme et posée, volume constant du début à la fin, jamais de chuchotement :",
   "elevenlabs_voice_id": "5l4ttmr4SKNgi0HnOelT",
   "elevenlabs_model": "eleven_multilingual_v2",
   "elevenlabs_voice_settings": {"stability": 0.6, "similarity_boost": 0.75, "speed": 0.92},
