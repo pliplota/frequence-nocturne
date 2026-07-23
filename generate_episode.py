@@ -271,6 +271,11 @@ def _request_tts_gemini(text, api_key):
             "contents": [{"parts": [{"text": f"{style} {text}"}]}],
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
+                # Basse température = moins de dérive créative loin de la
+                # consigne de style (jamais essayé jusqu'ici — la voix
+                # dérivait vers le chuchotement malgré plusieurs formulations
+                # de prompt différentes).
+                "temperature": CONFIG.get("tts_temperature", 0.3),
                 "speechConfig": {
                     "voiceConfig": {
                         "prebuiltVoiceConfig": {
