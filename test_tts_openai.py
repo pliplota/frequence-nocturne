@@ -22,7 +22,10 @@ DEFAULT_TEXT = (
     f"{ge.CONFIG['intro_ritual']} "
     f"Bonsoir, ici {ge.CONFIG['presenter_name']}. Ce soir, comme toutes les nuits, "
     "j'ai reçu vos témoignages. En voici un premier, qui m'a été envoyé par "
-    "Sophie L., dans les Vosges."
+    "Sophie L., dans les Vosges. Elle raconte : je me suis réveillée vers "
+    "trois heures du matin, sans raison. La maison était silencieuse. Et "
+    "puis j'ai entendu, très distinctement, des pas dans le couloir. "
+    "Lents. Réguliers. Je vis seule. Je n'ai jamais retrouvé d'explication."
 )
 
 

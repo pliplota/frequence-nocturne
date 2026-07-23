@@ -271,7 +271,7 @@ class RetryableError(Exception):
 RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
 
 
-def _with_retries(request_fn, label, max_attempts=5):
+def _with_retries(request_fn, label, max_attempts=5, fatal=True):
     last_error = None
     for attempt in range(1, max_attempts + 1):
         try:
@@ -282,7 +282,11 @@ def _with_retries(request_fn, label, max_attempts=5):
                 wait = 10 * attempt  # 10s, 20s, 30s...
                 print(f"     (tentative {attempt}/{max_attempts} échouée : {e} — nouvel essai dans {wait}s)")
                 time.sleep(wait)
-    sys.exit(f"ERREUR : {label} a échoué {max_attempts} fois de suite : {last_error}")
+    msg = f"{label} a échoué {max_attempts} fois de suite : {last_error}"
+    if fatal:
+        sys.exit(f"ERREUR : {msg}")
+    print(f"AVERTISSEMENT : {msg}")
+    return None
 
 
 def _request_tts_gemini(text, api_key):
@@ -619,11 +623,32 @@ def mix(voice_path, out_path):
 
     filters = []
     if have_music:
+        # Musique découpée en deux tronçons continus (même flux, sans
+        # coupure/redémarrage à la jointure) : un tronçon "lead-in" joué
+        # seul avant la voix, puis un tronçon qui enchaîne exactement là où
+        # le premier s'arrête, mixé avec la voix. Remplace un ancien montage
+        # à base d'adelay(voix)+amix(duration=first) sur toute la durée qui
+        # produisait un silence quasi total (-83dB mesuré) pendant les 5s de
+        # lead-in sur les épisodes publiés en CI, sans qu'on ait réussi à
+        # reproduire le même silence total en local (0.16 de volume donne
+        # une musique discrète mais bien présente en local) — probablement
+        # une différence de comportement d'amix selon la version de ffmpeg.
+        # Ce découpage explicite ne dépend plus de ce genre de subtilité :
+        # le tronçon lead-in est de la musique seule, point.
+        # (Le fondu d'entrée est appliqué plus bas sur [bedraw], qui
+        # commence par ce tronçon — pas besoin de le refaire ici.)
+        filters.append(f"[{music_idx}:a]asplit=2[mlead][mbody]")
         filters.append(
-            f"[0:a]{voice_filter},adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[v]"
+            f"[mlead]atrim=0:{lead_in},asetpts=PTS-STARTPTS,volume={vol}[introm]"
         )
-        filters.append(f"[{music_idx}:a]volume={vol}[m]")
-        filters.append("[v][m]amix=inputs=2:duration=first:dropout_transition=4[bedraw]")
+        filters.append(
+            f"[mbody]atrim=start={lead_in},asetpts=PTS-STARTPTS,volume={vol}[bodym]"
+        )
+        filters.append(f"[0:a]{voice_filter},apad=pad_dur={tail}[vpad]")
+        filters.append(
+            "[vpad][bodym]amix=inputs=2:duration=first:dropout_transition=4[bodymix]"
+        )
+        filters.append("[introm][bodymix]concat=n=2:v=0:a=1[bedraw]")
     else:
         filters.append(
             f"[0:a]{voice_filter},adelay={int(lead_in*1000)}|{int(lead_in*1000)},apad=pad_dur={tail}[bedraw]"
@@ -658,7 +683,108 @@ def mix(voice_path, out_path):
 
 
 # ---------------------------------------------------------------------------
-# 4. Flux RSS
+# 4. Image de couverture de l'épisode (une par épisode, réunit les 3 histoires)
+# ---------------------------------------------------------------------------
+
+def build_image_prompt(ep_data):
+    return (
+        "Illustration de couverture pour un épisode du podcast français "
+        "\"Fréquence Nocturne\" (histoires paranormales lues à la radio, la "
+        "nuit). Ambiance sombre, inquiétante, mystérieuse ; clair-obscur, "
+        "éclairage nocturne, brume légère ; style peinture numérique "
+        "cinématographique, évocateur plutôt que littéral. Aucun texte, "
+        "aucune typographie, aucun logo dans l'image. Pas de visage humain "
+        "reconnaissable au premier plan (silhouettes, ombres, ou éléments "
+        "symboliques à la place). L'image doit évoquer ensemble, sans les "
+        "illustrer littéralement une par une, les trois histoires de cet "
+        f"épisode : {ep_data['title']}. {ep_data['description']}"
+    )
+
+
+def _request_image_openai(prompt, api_key):
+    model = CONFIG.get("openai_image_model", "gpt-image-1")
+    size = CONFIG.get("openai_image_size", "1024x1024")
+    quality = CONFIG.get("openai_image_quality", "low")
+    url = "https://api.openai.com/v1/images/generations"
+    body = json.dumps(
+        {
+            "model": model, "prompt": prompt, "size": size,
+            "quality": quality, "output_format": "jpeg", "n": 1,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.load(r)
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code in RETRYABLE_HTTP_CODES:
+            raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
+        # Pas de sys.exit ici (contrairement aux autres appels API) : une
+        # image refusée par la modération ou une erreur de paramètres ne
+        # doit jamais faire échouer tout le run et perdre le texte/la voix
+        # déjà générés (et déjà payés) pour cet épisode.
+        raise RuntimeError(f"HTTP {e.code} : {body_text[:500]}")
+    except NETWORK_ERRORS as e:
+        raise RetryableError(f"{type(e).__name__} : {e}")
+    return data["data"][0]["b64_json"]
+
+
+def generate_episode_image(ep_data, out_path):
+    """Génère l'image de couverture de l'épisode. Optionnel : si ça échoue
+    (quota, modération, panne...), on avertit et on publie l'épisode sans
+    image plutôt que de perdre le texte et la voix déjà générés."""
+    provider = CONFIG.get("episode_image_provider", "openai")
+    if provider != "openai":
+        print(f"AVERTISSEMENT : episode_image_provider inconnu ({provider!r}) — pas d'image générée.")
+        return False
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("AVERTISSEMENT : OPENAI_API_KEY absente — pas d'image de couverture générée.")
+        return False
+
+    prompt = build_image_prompt(ep_data)
+    try:
+        b64 = _with_retries(
+            lambda: _request_image_openai(prompt, api_key),
+            "OpenAI Images", max_attempts=3, fatal=False,
+        )
+    except Exception as e:
+        b64 = None
+        print(f"AVERTISSEMENT : génération d'image échouée ({e}) — épisode publié sans image de couverture.")
+    if not b64:
+        return False
+
+    # gpt-image-1 plafonne à 1024x1024 en carré — en dessous du minimum
+    # exigé par Apple Podcasts/Spotify pour l'artwork (1400x1400, jusqu'à
+    # 3000x3000 recommandé ; docs/cover.jpg fait 1600x1600). Une image trop
+    # petite est silencieusement ignorée par ces plateformes plutôt que
+    # rejetée avec une erreur visible — on l'agrandit donc systématiquement
+    # avant de la publier.
+    raw = base64.b64decode(b64)
+    tmp_path = out_path + ".raw.jpg"
+    with open(tmp_path, "wb") as f:
+        f.write(raw)
+    try:
+        subprocess.check_call(
+            [
+                "ffmpeg", "-y", "-i", tmp_path,
+                "-vf", "scale=1600:1600:flags=lanczos",
+                "-q:v", "2",
+                out_path,
+            ],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    finally:
+        os.remove(tmp_path)
+    return True
+
+
+# ---------------------------------------------------------------------------
+# 5. Flux RSS
 # ---------------------------------------------------------------------------
 
 def esc(s):
@@ -675,12 +801,18 @@ def write_feed(episodes):
     items = []
     for ep in episodes[-cfg.get("keep_last_episodes_in_feed", 100):][::-1]:
         pub = dt.datetime.fromisoformat(ep["date"])
+        # Ancienne entrée générée avant l'ajout des images de couverture par
+        # épisode, ou génération d'image qui a échoué : pas de balise, l'app
+        # retombe sur l'image du show (cover.jpg) pour cet épisode.
+        image_tag = ""
+        if ep.get("image"):
+            image_tag = f'\n      <itunes:image href="{base}/episodes/{esc(ep["image"])}"/>'
         items.append(f"""    <item>
       <title>{esc(ep['title'])}</title>
       <description>{esc(ep['description'])}</description>
       <pubDate>{rfc2822(pub)}</pubDate>
       <guid isPermaLink="false">{esc(ep['guid'])}</guid>
-      <enclosure url="{base}/episodes/{ep['file']}" length="{ep['bytes']}" type="audio/mpeg"/>
+      <enclosure url="{base}/episodes/{ep['file']}" length="{ep['bytes']}" type="audio/mpeg"/>{image_tag}
       <itunes:duration>{ep['duration']}</itunes:duration>
       <itunes:explicit>false</itunes:explicit>
       <itunes:episodeType>full</itunes:episodeType>
@@ -752,20 +884,25 @@ def main():
             filename = f"{stamp}-{n}.mp3"
     slug = os.path.splitext(filename)[0]
 
-    print("1/4  Génération du texte (Gemini)…")
+    print("1/5  Génération du texte (Gemini)…")
     past_titles = [ep["title"] for ep in episodes]
     ep_data = call_gemini(build_prompt(past_titles))
     script = clean_script(ep_data["script"].strip())
     print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
 
-    print(f"2/4  Synthèse vocale ({CONFIG.get('tts_provider', 'gemini')})…")
+    print(f"2/5  Synthèse vocale ({CONFIG.get('tts_provider', 'gemini')})…")
     voice_path = os.path.join(ROOT, "voice_tmp.mp3")
     synthesize(script, voice_path)
 
-    print("3/4  Mixage avec la musique d'ambiance (ffmpeg)…")
+    print("3/5  Mixage avec la musique d'ambiance (ffmpeg)…")
     out_path = os.path.join(EPISODES_DIR, filename)
     mix(voice_path, out_path)
     os.remove(voice_path)
+
+    print("4/5  Image de couverture (OpenAI)…")
+    image_filename = f"{slug}.jpg"
+    image_path = os.path.join(EPISODES_DIR, image_filename)
+    has_image = generate_episode_image(ep_data, image_path)
 
     duration = probe_duration(out_path)
     num = len(episodes) + 1
@@ -778,10 +915,11 @@ def main():
             "bytes": os.path.getsize(out_path),
             "duration": hhmmss(duration),
             "guid": f"frequence-nocturne-{slug}",
+            "image": image_filename if has_image else None,
         }
     )
 
-    print("4/4  Mise à jour du flux RSS…")
+    print("5/5  Mise à jour du flux RSS…")
     with open(EPISODES_JSON, "w", encoding="utf-8") as f:
         json.dump(episodes, f, ensure_ascii=False, indent=2)
     write_feed(episodes)
