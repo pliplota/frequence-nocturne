@@ -7,7 +7,7 @@
   "language": "fr",
   "tts_provider": "gemini",
   "voice": "Charon",
-  "tts_model": "gemini-3.1-flash-tts-preview",
+  "tts_model": "gemini-2.5-flash-preview-tts",
   "tts_style_prompt": "Voix ferme et posée, volume constant du début à la fin, jamais de chuchotement :",
   "tts_temperature": 0.3,
   "elevenlabs_voice_id": "5l4ttmr4SKNgi0HnOelT",
