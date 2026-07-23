@@ -318,7 +318,7 @@ def _request_tts_gemini(text, api_key):
         url, data=body, headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=90) as r:
+        with urllib.request.urlopen(req, timeout=180) as r:
             data = json.load(r)
     except urllib.error.HTTPError as e:
         # Affiche le corps de la réponse d'erreur (urllib ne le montre pas
