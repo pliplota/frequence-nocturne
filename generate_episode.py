@@ -140,10 +140,7 @@ RÉPONDS UNIQUEMENT avec un objet JSON valide, sans balises markdown, au format 
 }}"""
 
 
-def call_gemini(prompt):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
+def _request_gemini_text(prompt, api_key):
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         "gemini-2.5-flash:generateContent?key=" + api_key
@@ -175,16 +172,38 @@ def call_gemini(prompt):
     req = urllib.request.Request(
         url, data=body, headers={"Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(req, timeout=180) as r:
-        data = json.load(r)
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r:
+            data = json.load(r)
+    except urllib.error.HTTPError as e:
+        # Ce même genre d'erreur transitoire (429/503...) qui frappait la
+        # partie TTS peut tout aussi bien arriver ici — call_gemini() n'avait
+        # jusqu'ici aucune gestion d'erreur du tout et plantait immédiatement.
+        body_text = e.read().decode("utf-8", errors="replace")
+        if e.code == 429 and "per_day" in body_text:
+            sys.exit(
+                "ERREUR : quota quotidien Gemini (texte) épuisé — réessaie "
+                "plus tard :\n" + body_text[:1500]
+            )
+        if e.code in RETRYABLE_HTTP_CODES:
+            raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
+        sys.exit(f"ERREUR HTTP {e.code} de l'API Gemini (texte) :\n" + body_text[:2000])
+
     candidate = data["candidates"][0]
     if candidate.get("finishReason") == "MAX_TOKENS":
         sys.exit(
             "ERREUR : réponse Gemini tronquée (maxOutputTokens atteint) — "
-            "augmente maxOutputTokens dans call_gemini()."
+            "augmente maxOutputTokens dans _request_gemini_text()."
         )
     text = candidate["content"]["parts"][0]["text"]
     return json.loads(text)
+
+
+def call_gemini(prompt):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        sys.exit("ERREUR : variable d'environnement GEMINI_API_KEY absente.")
+    return _with_retries(lambda: _request_gemini_text(prompt, api_key), "Gemini (texte)")
 
 
 def clean_script(text):
@@ -231,7 +250,7 @@ def _pcm_to_wav_bytes(pcm_bytes, sample_rate=24000, channels=1, sample_width=2):
     return buf.getvalue()
 
 
-class TTSRetryableError(Exception):
+class RetryableError(Exception):
     """Échec probablement transitoire (finishReason != STOP avec contenu
     vide, ou erreur HTTP temporaire côté serveur) — vaut le coup de
     réessayer avant d'abandonner."""
@@ -245,7 +264,7 @@ def _with_retries(request_fn, label, max_attempts=4):
     for attempt in range(1, max_attempts + 1):
         try:
             return request_fn()
-        except TTSRetryableError as e:
+        except RetryableError as e:
             last_error = e
             if attempt < max_attempts:
                 wait = 10 * attempt  # 10s, 20s, 30s...
@@ -309,7 +328,7 @@ def _request_tts_gemini(text, api_key):
         if e.code in RETRYABLE_HTTP_CODES:
             # Erreur serveur temporaire (surcharge, rate limit...) : vaut
             # le coup de réessayer plutôt qu'abandonner direct.
-            raise TTSRetryableError(f"HTTP {e.code} : {body[:500]}")
+            raise RetryableError(f"HTTP {e.code} : {body[:500]}")
         sys.exit(f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n" + body[:2000])
 
     candidate = (data.get("candidates") or [{}])[0]
@@ -324,7 +343,7 @@ def _request_tts_gemini(text, api_key):
             # candidatesTokenCount non nul mais content vide, finishReason
             # "OTHER" — transitoire dans les cas observés, vaut le coup
             # de réessayer plutôt que d'abandonner direct.
-            raise TTSRetryableError(
+            raise RetryableError(
                 f"finishReason={finish_reason}, content vide : "
                 + json.dumps(data, ensure_ascii=False)[:500]
             )
@@ -369,7 +388,7 @@ def _request_tts_elevenlabs(text, api_key):
     except urllib.error.HTTPError as e:
         body_text = e.read().decode("utf-8", errors="replace")
         if e.code in RETRYABLE_HTTP_CODES:
-            raise TTSRetryableError(f"HTTP {e.code} : {body_text[:500]}")
+            raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
         sys.exit(f"ERREUR HTTP {e.code} de l'API ElevenLabs :\n" + body_text[:2000])
 
 
