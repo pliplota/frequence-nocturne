@@ -15,6 +15,7 @@ Usage : python generate_episode.py
 import base64
 import datetime as dt
 import html
+import http.client
 import io
 import json
 import os
@@ -28,6 +29,12 @@ import time
 import urllib.error
 import urllib.request
 import wave
+
+# Erreurs réseau/connexion (pas une vraie réponse HTTP d'erreur : timeout,
+# DNS, connexion coupée par le serveur avant d'avoir répondu...) — toujours
+# transitoires par nature, toujours à réessayer plutôt qu'à traiter comme
+# fatales.
+NETWORK_ERRORS = (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(ROOT, "docs")
@@ -188,6 +195,8 @@ def _request_gemini_text(prompt, api_key):
         if e.code in RETRYABLE_HTTP_CODES:
             raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
         sys.exit(f"ERREUR HTTP {e.code} de l'API Gemini (texte) :\n" + body_text[:2000])
+    except NETWORK_ERRORS as e:
+        raise RetryableError(f"{type(e).__name__} : {e}")
 
     candidate = data["candidates"][0]
     if candidate.get("finishReason") == "MAX_TOKENS":
@@ -330,6 +339,8 @@ def _request_tts_gemini(text, api_key):
             # le coup de réessayer plutôt qu'abandonner direct.
             raise RetryableError(f"HTTP {e.code} : {body[:500]}")
         sys.exit(f"ERREUR HTTP {e.code} de l'API Gemini TTS :\n" + body[:2000])
+    except NETWORK_ERRORS as e:
+        raise RetryableError(f"{type(e).__name__} : {e}")
 
     candidate = (data.get("candidates") or [{}])[0]
     finish_reason = candidate.get("finishReason")
@@ -390,6 +401,8 @@ def _request_tts_elevenlabs(text, api_key):
         if e.code in RETRYABLE_HTTP_CODES:
             raise RetryableError(f"HTTP {e.code} : {body_text[:500]}")
         sys.exit(f"ERREUR HTTP {e.code} de l'API ElevenLabs :\n" + body_text[:2000])
+    except NETWORK_ERRORS as e:
+        raise RetryableError(f"{type(e).__name__} : {e}")
 
 
 def synthesize_chunk_elevenlabs(text, api_key, out_path):
