@@ -96,7 +96,7 @@ def build_prompt(past_titles):
     ]
     step = 2
     for i, theme in enumerate(themes, start=1):
-        structure.append(f"{step}. TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 550-700 mots.")
+        structure.append(f"{step}. TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots.")
         step += 1
         if i < n:
             structure.append(f"{step}. Transition + commentaire sobre du présentateur.")
@@ -508,13 +508,15 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
 
 
 # Chien de garde anti-explosion de requêtes : un épisode normal tient en
-# ~8-10 morceaux. Si un futur changement de réglage (max_chars trop petit,
-# régression du découpage...) en produit brutalement beaucoup plus — comme
-# le découpage phrase par phrase qui avait généré ~240 requêtes et épuisé
-# le quota Gemini en un seul épisode — on préfère échouer bruyamment AVANT
-# d'appeler l'API plutôt que de cramer un budget de requêtes (quota ou,
-# pire, crédits payants OpenAI/ElevenLabs) sans s'en rendre compte.
-MAX_TTS_CHUNKS = 20
+# ~8-18 morceaux selon le fournisseur (jusqu'à ~18 pour Gemini avec des
+# témoignages rallongés à 900-1100 mots chacun). Si un futur changement de
+# réglage (max_chars trop petit, régression du découpage...) en produit
+# brutalement beaucoup plus — comme le découpage phrase par phrase qui
+# avait généré ~240 requêtes et épuisé le quota Gemini en un seul épisode —
+# on préfère échouer bruyamment AVANT d'appeler l'API plutôt que de cramer
+# un budget de requêtes (quota ou, pire, crédits payants OpenAI/ElevenLabs)
+# sans s'en rendre compte.
+MAX_TTS_CHUNKS = 30
 
 
 def synthesize(text, out_path):
