@@ -5,3 +5,4 @@ test_voice_openai.mp3
 test_image_openai.jpg
 run_daily.ps1
 run_daily.log
+generate_now.ps1

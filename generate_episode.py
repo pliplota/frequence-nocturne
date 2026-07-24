@@ -122,7 +122,10 @@ type de passage : ton de présentateur (posé, en contrôle) pour les parties
 qu'il raconte, pour les parties [histoire]. Le script doit donc être découpé
 en segments typés en conséquence (voir le format de réponse plus bas) — écris
 chaque témoignage comme un texte que quelqu'un raconte en le ressentant
-vraiment, pas comme une lecture neutre de présentateur.
+vraiment, pas comme une lecture neutre de présentateur. Ce ton plus immersif
+ne dispense pas des règles d'écriture ci-dessous (signature, absence de
+résolution, détails concrets) : elles s'appliquent toujours, y compris dans
+les segments [histoire].
 
 RÈGLES D'ÉCRITURE (très important) :
 - Les témoignages doivent sembler RÉELS et CRÉDIBLES. Pas de fantômes qui parlent,
@@ -132,8 +135,11 @@ RÈGLES D'ÉCRITURE (très important) :
 - Le témoin doute de lui-même ("je ne sais toujours pas ce que j'ai vu",
   "il y a sûrement une explication, mais…").
 - AUCUNE résolution. L'histoire reste ouverte.
-- Chaque témoignage est signé d'un prénom + initiale + département
-  (ex : "Nathalie R., dans l'Ain"). Prénoms français courants variés.
+- Chaque témoignage (segment [histoire]) se termine TOUJOURS par la
+  signature du témoin, un prénom + initiale + département
+  (ex : "Nathalie R., dans l'Ain"), même avec le ton immersif demandé plus
+  haut — c'est ce qui permet au présentateur d'annoncer qui a écrit.
+  Prénoms français courants variés.
 - Style oral : phrases courtes, respirations, langage parlé naturel.
 - Le présentateur fait une courte transition entre chaque témoignage,
   et un très bref commentaire sobre après chacun (2-3 phrases max).
