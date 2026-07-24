@@ -3,3 +3,5 @@ __pycache__/
 voice_tmp.mp3
 test_voice_openai.mp3
 test_image_openai.jpg
+run_daily.ps1
+run_daily.log

@@ -1,13 +1,12 @@
 name: Épisode quotidien
 
 on:
-  schedule:
-    # 16:30 UTC = 18:30 à Paris en été (17:30 en hiver).
-    # Marge volontaire pour que l'épisode soit prêt avant 20:00.
-    # Créneau du matin retiré pour économiser le quota quotidien très
-    # restreint de gemini-3.1-flash-tts-preview (100 requêtes/jour).
-    - cron: "30 16 * * *"
-  workflow_dispatch: {}   # permet aussi de lancer un épisode à la main
+  # Déclenchement automatique quotidien désormais géré en local (Tâches
+  # planifiées Windows, machine toujours allumée) plutôt qu'ici, pour éviter
+  # une double génération (donc un double coût API) le même jour. Le cron
+  # "30 16 * * *" (18h30 Paris) a été retiré le 2026-07-24 — le
+  # workflow_dispatch manuel reste en secours si besoin.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
