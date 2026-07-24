@@ -690,14 +690,97 @@ def build_image_prompt(ep_data):
     return (
         "Illustration de couverture pour un épisode du podcast français "
         "\"Fréquence Nocturne\" (histoires paranormales lues à la radio, la "
-        "nuit). Ambiance sombre, inquiétante, mystérieuse ; clair-obscur, "
-        "éclairage nocturne, brume légère ; style peinture numérique "
-        "cinématographique, évocateur plutôt que littéral. Aucun texte, "
-        "aucune typographie, aucun logo dans l'image. Pas de visage humain "
-        "reconnaissable au premier plan (silhouettes, ombres, ou éléments "
-        "symboliques à la place). L'image doit évoquer ensemble, sans les "
-        "illustrer littéralement une par une, les trois histoires de cet "
-        f"épisode : {ep_data['title']}. {ep_data['description']}"
+        "nuit). Doit respecter l'identité visuelle déjà établie de ce "
+        "podcast, pas être une illustration d'horreur générique : ambiance "
+        "nocturne sombre et tamisée, mais où tous les éléments et "
+        "personnages de la scène restent nettement visibles et lisibles au "
+        "premier coup d'œil — surtout PAS une image sous-exposée où tout se "
+        "fond dans un noir uniforme indistinct. Contraste marqué façon "
+        "clair-obscur (zones sombres ET zones bien éclairées qui se "
+        "détachent nettement), plutôt qu'une sous-exposition générale. "
+        "Palette signature : dominante sombre (noir, anthracite, bleu nuit) "
+        "mais avec des zones de lumière chaude crème/blanc cassé "
+        "suffisamment larges et lumineuses pour bien détacher les sujets du "
+        "fond, touches de bleu-gris désaturé — jamais de couleurs vives ou "
+        "saturées, jamais de rouge criard. Élément visuel "
+        "récurrent qui identifie la série d'un épisode à l'autre : évoque "
+        "un objet de radio de nuit vintage (vieux poste à cadran lumineux, "
+        "micro de studio, ondes/fréquences stylisées, antenne, VU-mètre) "
+        "intégré discrètement dans la composition, mêlé à un ou deux "
+        "éléments symboliques propres à cet épisode. Style peinture "
+        "numérique cinématographique et épurée, clair-obscur, grain "
+        "photographique léger, évocateur plutôt que littéral, composition "
+        "centrée sur fond largement négatif (le noir doit dominer l'image, "
+        "pas une scène surchargée). Aucun texte, aucune typographie, aucun "
+        "logo dans l'image — ni bandeau, ni pancarte, ni panneau lumineux "
+        "du style \"ON AIR\". Pas de visage humain reconnaissable au "
+        "premier plan (silhouettes, ombres, ou "
+        "éléments symboliques à la place). "
+        "L'image doit évoquer ensemble, sans les illustrer littéralement "
+        f"une par une, les trois histoires de cet épisode : {ep_data['title']}. "
+        f"{ep_data['description']}"
+    )
+
+
+# Polices candidates pour le titre dessiné sur l'image (voir
+# add_title_frame ci-dessous) : d'abord Creepster (fonts/Creepster-Regular.ttf,
+# police "horreur" au style dégoulinant, licence OFL, embarquée dans le
+# dépôt — aucune police de ce genre n'est fiablement préinstallée ni sur
+# Windows ni sur le runner Ubuntu de GitHub Actions, d'où le fait de la
+# committer directement plutôt que de dépendre du système). Repli sur des
+# polices système si le fichier venait à manquer.
+TITLE_FONT_CANDIDATES = [
+    os.path.join(ROOT, "fonts", "Creepster-Regular.ttf"),
+    "C:/Windows/Fonts/georgiab.ttf",
+    "C:/Windows/Fonts/timesbd.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSerif-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
+
+
+def _find_title_font():
+    for path in TITLE_FONT_CANDIDATES:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def add_title_frame(image_path, out_path, size=1600):
+    """Dessine un encadré rouge avec le titre du podcast en incrustation
+    fixe, par-dessus l'illustration générée. Fait avec ffmpeg (deterministe,
+    toujours la même orthographe) plutôt que demandé au modèle d'image : le
+    rendu de texte par un modèle génératif n'est pas fiable, surtout avec
+    des accents ("ON AIR" mal placé/mal orthographié a déjà été observé sur
+    un test), alors que c'est le même titre fixe à chaque épisode."""
+    margin = int(size * 0.05)
+    box_h = int(size * 0.1)
+    box_w = size - 2 * margin
+    box_y = size - margin - box_h
+    title = CONFIG.get("show_name", "Fréquence Nocturne").upper()
+
+    vf = (
+        f"drawbox=x={margin}:y={box_y}:w={box_w}:h={box_h}:"
+        f"color=0xB3121B:t=6"
+    )
+    font = _find_title_font()
+    if font:
+        # Échappement ffmpeg drawtext : ':' et '\' sont des séparateurs de
+        # filtre, le nom de police (chemin Windows notamment) peut en
+        # contenir.
+        font_escaped = font.replace("\\", "/").replace(":", r"\:")
+        fontsize = int(box_h * 0.42)
+        vf += (
+            f",drawtext=fontfile='{font_escaped}':text='{title}':"
+            f"fontcolor=0xF2ECDF:fontsize={fontsize}:"
+            f"x=(w-text_w)/2:y={box_y}+({box_h}-text_h)/2"
+        )
+    else:
+        print("AVERTISSEMENT : aucune police trouvée pour le titre — encadré rouge sans texte.")
+
+    subprocess.check_call(
+        ["ffmpeg", "-y", "-i", image_path, "-vf", vf, "-q:v", "2", out_path],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
 
@@ -765,21 +848,27 @@ def generate_episode_image(ep_data, out_path):
     # rejetée avec une erreur visible — on l'agrandit donc systématiquement
     # avant de la publier.
     raw = base64.b64decode(b64)
-    tmp_path = out_path + ".raw.jpg"
-    with open(tmp_path, "wb") as f:
+    tmp_raw = out_path + ".raw.jpg"
+    with open(tmp_raw, "wb") as f:
         f.write(raw)
     try:
+        # gamma>1 remonte les tons sombres (détails visibles dans les
+        # zones noires) sans trop laver les hautes lumières ; léger boost
+        # de luminosité/contraste en filet de sécurité si le modèle rend
+        # quand même l'image trop sombre malgré la consigne du prompt.
+        # Pas de cadre/titre incrusté : juste l'illustration (voir
+        # add_title_frame plus haut si on veut le réactiver plus tard).
         subprocess.check_call(
             [
-                "ffmpeg", "-y", "-i", tmp_path,
-                "-vf", "scale=1600:1600:flags=lanczos",
+                "ffmpeg", "-y", "-i", tmp_raw,
+                "-vf", "scale=1600:1600:flags=lanczos,eq=gamma=1.35:brightness=0.04:contrast=1.05",
                 "-q:v", "2",
                 out_path,
             ],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     finally:
-        os.remove(tmp_path)
+        os.remove(tmp_raw)
     return True
 
 
