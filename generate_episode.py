@@ -89,22 +89,22 @@ def build_prompt(past_titles):
     avoid = "\n".join(f"- {t}" for t in past_titles[-12:]) or "(aucun)"
 
     structure = [
-        f'1. INTRO : le présentateur dit exactement cette phrase rituelle :\n'
+        f'1. [presentateur] INTRO : le présentateur dit exactement cette phrase rituelle :\n'
         f'   "{CONFIG["intro_ritual"]}"\n'
         f'   puis il se présente ("Bonsoir, ici {CONFIG["presenter_name"]}…"), annonce brièvement '
         f'les {NUM_WORDS.get(n, n)} témoignages du soir (sans divulgâcher), de façon variée à chaque épisode.'
     ]
     step = 2
     for i, theme in enumerate(themes, start=1):
-        structure.append(f"{step}. TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots.")
+        structure.append(f"{step}. [histoire] TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots.")
         step += 1
         if i < n:
-            structure.append(f"{step}. Transition + commentaire sobre du présentateur.")
+            structure.append(f"{step}. [presentateur] Transition + commentaire sobre du présentateur.")
         else:
-            structure.append(f"{step}. Bref commentaire.")
+            structure.append(f"{step}. [presentateur] Bref commentaire.")
         step += 1
     structure.append(
-        f'{step}. OUTRO : le présentateur conclut avec exactement ce texte rituel :\n'
+        f'{step}. [presentateur] OUTRO : le présentateur conclut avec exactement ce texte rituel :\n'
         f'   "{CONFIG["outro_ritual"]}"'
     )
     structure_text = "\n".join(structure)
@@ -115,6 +115,14 @@ CONCEPT : {CONFIG['presenter_name']}, la cinquantaine, ancien journaliste de nui
 lit à l'antenne les témoignages paranormaux que des auditeurs lui envoient par mail.
 Ton : radio de nuit, calme, sobre, jamais sensationnaliste. Il ne tranche jamais :
 il lit, il laisse le doute exister.
+
+Le texte final sera lu par une synthèse vocale qui change de registre selon le
+type de passage : ton de présentateur (posé, en contrôle) pour les parties
+[presentateur], ton plus habité et ému, comme quelqu'un qui revit vraiment ce
+qu'il raconte, pour les parties [histoire]. Le script doit donc être découpé
+en segments typés en conséquence (voir le format de réponse plus bas) — écris
+chaque témoignage comme un texte que quelqu'un raconte en le ressentant
+vraiment, pas comme une lecture neutre de présentateur.
 
 RÈGLES D'ÉCRITURE (très important) :
 - Les témoignages doivent sembler RÉELS et CRÉDIBLES. Pas de fantômes qui parlent,
@@ -129,21 +137,31 @@ RÈGLES D'ÉCRITURE (très important) :
 - Style oral : phrases courtes, respirations, langage parlé naturel.
 - Le présentateur fait une courte transition entre chaque témoignage,
   et un très bref commentaire sobre après chacun (2-3 phrases max).
-- Le champ "script" est lu tel quel par une voix de synthèse : AUCUN
+- Chaque "text" de segment est lu tel quel par une voix de synthèse : AUCUN
   astérisque, dièse, tiret de liste ou autre symbole de mise en forme
   Markdown dedans, uniquement du texte brut.
 
-STRUCTURE DE L'ÉPISODE :
+STRUCTURE DE L'ÉPISODE (le préfixe entre crochets indique le type de segment
+attendu dans la réponse — un segment par ligne numérotée ci-dessous, dans le
+même ordre) :
 {structure_text}
 
 Titres d'épisodes déjà utilisés (NE PAS répéter les mêmes situations) :
 {avoid}
 
+"segments" doit contenir exactement un objet {{"type": ..., "text": ...}} par
+ligne numérotée de la STRUCTURE DE L'ÉPISODE ci-dessus, dans le même ordre,
+avec le type indiqué entre crochets sur cette ligne ("presentateur" ou
+"histoire").
+
 RÉPONDS UNIQUEMENT avec un objet JSON valide, sans balises markdown, au format :
 {{
   "title": "titre court et intrigant de l'épisode (sans numéro)",
   "description": "description de l'épisode en 2 phrases pour Spotify",
-  "script": "le texte INTÉGRAL de l'épisode, prêt à être lu à voix haute, sans didascalies, sans indications entre crochets, sans noms de sections"
+  "segments": [
+    {{"type": "presentateur", "text": "..."}},
+    {{"type": "histoire", "text": "..."}}
+  ]
 }}"""
 
 
@@ -169,9 +187,19 @@ def _request_gemini_text(prompt, api_key):
                     "properties": {
                         "title": {"type": "STRING"},
                         "description": {"type": "STRING"},
-                        "script": {"type": "STRING"},
+                        "segments": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "type": {"type": "STRING", "enum": ["presentateur", "histoire"]},
+                                    "text": {"type": "STRING"},
+                                },
+                                "required": ["type", "text"],
+                            },
+                        },
                     },
-                    "required": ["title", "description", "script"],
+                    "required": ["title", "description", "segments"],
                 },
             },
         }
@@ -289,13 +317,14 @@ def _with_retries(request_fn, label, max_attempts=5, fatal=True):
     return None
 
 
-def _request_tts_gemini(text, api_key):
-    style = CONFIG.get(
-        "tts_style_prompt",
-        "Lis ce texte à voix haute d'un ton calme, posé et mesuré, comme un "
-        "présentateur de radio de nuit, avec de courtes pauses naturelles "
-        "aux points de suspension et aux tirets d'incise :",
-    )
+def _request_tts_gemini(text, api_key, style=None):
+    if style is None:
+        style = CONFIG.get(
+            "tts_style_prompt",
+            "Lis ce texte à voix haute d'un ton calme, posé et mesuré, comme un "
+            "présentateur de radio de nuit, avec de courtes pauses naturelles "
+            "aux points de suspension et aux tirets d'incise :",
+        )
     model = CONFIG.get("tts_model", "gemini-2.5-flash-preview-tts")
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -372,9 +401,9 @@ def _request_tts_gemini(text, api_key):
     return audio_b64, mime_type
 
 
-def synthesize_chunk_gemini(text, api_key, out_path):
+def synthesize_chunk_gemini(text, api_key, out_path, style=None):
     audio_b64, mime_type = _with_retries(
-        lambda: _request_tts_gemini(text, api_key), "Gemini TTS"
+        lambda: _request_tts_gemini(text, api_key, style), "Gemini TTS"
     )
     raw = base64.b64decode(audio_b64)
     if not raw.startswith(b"RIFF"):
@@ -412,7 +441,9 @@ def _request_tts_elevenlabs(text, api_key):
         raise RetryableError(f"{type(e).__name__} : {e}")
 
 
-def synthesize_chunk_elevenlabs(text, api_key, out_path):
+def synthesize_chunk_elevenlabs(text, api_key, out_path, style=None):
+    # style ignoré : l'API ElevenLabs n'a pas d'équivalent "instructions" de
+    # ton par requête, seulement des voice_settings globaux (config.json).
     audio_bytes = _with_retries(
         lambda: _request_tts_elevenlabs(text, api_key), "ElevenLabs"
     )
@@ -420,15 +451,16 @@ def synthesize_chunk_elevenlabs(text, api_key, out_path):
         f.write(audio_bytes)
 
 
-def _request_tts_openai(text, api_key):
+def _request_tts_openai(text, api_key, instructions=None):
     model = CONFIG.get("openai_tts_model", "gpt-4o-mini-tts")
     voice = CONFIG.get("openai_voice", "onyx")
-    instructions = CONFIG.get(
-        "openai_voice_instructions",
-        "Voix grave et posée de présentateur radio de nuit. Volume et débit "
-        "constants du début à la fin, jamais de chuchotement ni de baisse "
-        "de volume, même sur les passages les plus intimistes.",
-    )
+    if instructions is None:
+        instructions = CONFIG.get(
+            "openai_voice_instructions",
+            "Voix grave et posée de présentateur radio de nuit. Volume et débit "
+            "constants du début à la fin, jamais de chuchotement ni de baisse "
+            "de volume, même sur les passages les plus intimistes.",
+        )
     url = "https://api.openai.com/v1/audio/speech"
     payload = {"model": model, "voice": voice, "input": text, "response_format": "mp3"}
     # tts-1 / tts-1-hd ne comprennent pas "instructions" (spécifique à
@@ -452,9 +484,9 @@ def _request_tts_openai(text, api_key):
         raise RetryableError(f"{type(e).__name__} : {e}")
 
 
-def synthesize_chunk_openai(text, api_key, out_path):
+def synthesize_chunk_openai(text, api_key, out_path, style=None):
     audio_bytes = _with_retries(
-        lambda: _request_tts_openai(text, api_key), "OpenAI TTS"
+        lambda: _request_tts_openai(text, api_key, style), "OpenAI TTS"
     )
     with open(out_path, "wb") as f:
         f.write(audio_bytes)
@@ -519,7 +551,26 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
 MAX_TTS_CHUNKS = 30
 
 
-def synthesize(text, out_path):
+def _style_for_segment(provider, seg_type):
+    """Résout le ton à appliquer selon le fournisseur TTS et le type de
+    segment ('presentateur' ou 'histoire') : un présentateur en contrôle
+    pour les interventions, un ton plus habité/ému pour les témoignages
+    lus, comme quelqu'un qui raconte une expérience qu'il a vraiment
+    vécue plutôt qu'une lecture neutre — tout en gardant partout la
+    contrainte anti-chuchotement qui a motivé le passage à OpenAI."""
+    if provider == "gemini":
+        key = "tts_style_prompt_histoire" if seg_type == "histoire" else "tts_style_prompt_presentateur"
+        return CONFIG.get(key, CONFIG.get("tts_style_prompt"))
+    if provider == "openai":
+        key = (
+            "openai_voice_instructions_histoire" if seg_type == "histoire"
+            else "openai_voice_instructions_presentateur"
+        )
+        return CONFIG.get(key, CONFIG.get("openai_voice_instructions"))
+    return None
+
+
+def synthesize(segments, out_path):
     provider = CONFIG.get("tts_provider", "gemini")
     if provider == "gemini":
         api_key = os.environ.get("GEMINI_API_KEY")
@@ -553,25 +604,33 @@ def synthesize(text, out_path):
             "(attendu 'gemini', 'elevenlabs' ou 'openai')."
         )
 
-    chunks = chunk_text(text, max_chars=max_chars)
-    if len(chunks) > MAX_TTS_CHUNKS:
+    # Découpage segment par segment (pas sur le texte entier bout à bout) :
+    # un morceau ne doit jamais mélanger du texte "presentateur" et
+    # "histoire", sinon on ne peut pas leur appliquer un ton différent.
+    jobs = []  # [(chunk_text, style), ...]
+    for seg in segments:
+        style = _style_for_segment(provider, seg.get("type"))
+        for chunk in chunk_text(seg["text"], max_chars=max_chars):
+            jobs.append((chunk, style))
+
+    if len(jobs) > MAX_TTS_CHUNKS:
         sys.exit(
-            f"ERREUR : découpage en {len(chunks)} morceaux pour la synthèse "
+            f"ERREUR : découpage en {len(jobs)} morceaux pour la synthèse "
             f"{provider} — au-delà du plafond de sécurité ({MAX_TTS_CHUNKS}). "
             "Aucune requête envoyée. Vérifie chunk_text()/max_chars avant de "
             "relancer : c'est probablement une régression du découpage, pas "
             "un texte légitimement 20x plus long que d'habitude."
         )
-    print(f"     ({len(chunks)} requête(s) {provider})")
+    print(f"     ({len(jobs)} requête(s) {provider})")
 
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
         part_paths = []
-        for i, chunk in enumerate(chunks):
+        for i, (chunk, style) in enumerate(jobs):
             if i > 0 and pace_seconds:
                 time.sleep(pace_seconds)
             part_path = os.path.join(tmp_dir, f"part_{i:03d}.{ext}")
-            synth_fn(chunk, api_key, part_path)
+            synth_fn(chunk, api_key, part_path, style=style)
             part_paths.append(part_path)
         _concat_with_crossfade(part_paths, out_path)
     finally:
@@ -978,12 +1037,17 @@ def main():
     print("1/5  Génération du texte (Gemini)…")
     past_titles = [ep["title"] for ep in episodes]
     ep_data = call_gemini(build_prompt(past_titles))
-    script = clean_script(ep_data["script"].strip())
-    print(f"     Titre : {ep_data['title']}  ({len(script.split())} mots)")
+    segments = [
+        {"type": seg.get("type"), "text": clean_script(seg["text"].strip())}
+        for seg in ep_data["segments"]
+        if seg.get("text", "").strip()
+    ]
+    total_words = sum(len(seg["text"].split()) for seg in segments)
+    print(f"     Titre : {ep_data['title']}  ({total_words} mots, {len(segments)} segments)")
 
     print(f"2/5  Synthèse vocale ({CONFIG.get('tts_provider', 'gemini')})…")
     voice_path = os.path.join(ROOT, "voice_tmp.mp3")
-    synthesize(script, voice_path)
+    synthesize(segments, voice_path)
 
     print("3/5  Mixage avec la musique d'ambiance (ffmpeg)…")
     out_path = os.path.join(EPISODES_DIR, filename)
