@@ -26,7 +26,7 @@
   "openai_image_quality": "low",
   "music_volume": 0.16,
   "intro_ritual": "Il est tard. Vous m'écoutez. Et quelqu'un, quelque part, a vu quelque chose qu'il ne s'explique pas.",
-  "outro_ritual": "C'était Fréquence Nocturne. Si vous aussi, une nuit, vous avez vu quelque chose d'inexplicable… écrivez-moi. Fréquence nocturne, arobase proton point me. Je lis tout. Et peut-être que la prochaine voix entendue ici… sera la vôtre. Bonne nuit.",
+  "outro_ritual": "C'était Fréquence Nocturne. Si vous aussi, une nuit, vous avez vécu quelque chose d'inexplicable ou étrange… écrivez-moi. Fréquence nocturne, arobase proton point me. Je lis tout. Et peut-être que la prochaine voix entendue ici… sera la vôtre. Bonne nuit.",
   "num_testimonies": 3,
   "target_minutes": 15,
   "author": "Fréquence Nocturne",
