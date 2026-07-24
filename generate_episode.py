@@ -92,14 +92,22 @@ def build_prompt(past_titles):
         f'1. [presentateur] INTRO : le présentateur dit exactement cette phrase rituelle :\n'
         f'   "{CONFIG["intro_ritual"]}"\n'
         f'   puis il se présente ("Bonsoir, ici {CONFIG["presenter_name"]}…"), annonce brièvement '
-        f'les {NUM_WORDS.get(n, n)} témoignages du soir (sans divulgâcher), de façon variée à chaque épisode.'
+        f'les {NUM_WORDS.get(n, n)} témoignages du soir (sans divulgâcher), de façon variée à chaque épisode, '
+        f"puis annonce le prénom (et le département) du premier témoin avant de lui laisser l'antenne."
     ]
     step = 2
     for i, theme in enumerate(themes, start=1):
-        structure.append(f"{step}. [histoire] TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots.")
+        structure.append(
+            f"{step}. [histoire] TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots. "
+            "Commence directement par le récit à la première personne — le témoin ne se "
+            "présente pas lui-même, le présentateur vient de le faire juste avant."
+        )
         step += 1
         if i < n:
-            structure.append(f"{step}. [presentateur] Transition + commentaire sobre du présentateur.")
+            structure.append(
+                f"{step}. [presentateur] Transition + commentaire sobre du présentateur, puis "
+                "annonce le prénom (et le département) du témoin suivant avant de lui laisser l'antenne."
+            )
         else:
             structure.append(f"{step}. [presentateur] Bref commentaire.")
         step += 1
@@ -123,9 +131,9 @@ qu'il raconte, pour les parties [histoire]. Le script doit donc être découpé
 en segments typés en conséquence (voir le format de réponse plus bas) — écris
 chaque témoignage comme un texte que quelqu'un raconte en le ressentant
 vraiment, pas comme une lecture neutre de présentateur. Ce ton plus immersif
-ne dispense pas des règles d'écriture ci-dessous (signature, absence de
-résolution, détails concrets) : elles s'appliquent toujours, y compris dans
-les segments [histoire].
+ne dispense pas des règles d'écriture ci-dessous (absence de résolution,
+détails concrets) : elles s'appliquent toujours, y compris dans les
+segments [histoire].
 
 RÈGLES D'ÉCRITURE (très important) :
 - Les témoignages doivent sembler RÉELS et CRÉDIBLES. Pas de fantômes qui parlent,
@@ -135,11 +143,14 @@ RÈGLES D'ÉCRITURE (très important) :
 - Le témoin doute de lui-même ("je ne sais toujours pas ce que j'ai vu",
   "il y a sûrement une explication, mais…").
 - AUCUNE résolution. L'histoire reste ouverte.
-- Chaque témoignage (segment [histoire]) se termine TOUJOURS par la
-  signature du témoin, un prénom + initiale + département
-  (ex : "Nathalie R., dans l'Ain"), même avec le ton immersif demandé plus
-  haut — c'est ce qui permet au présentateur d'annoncer qui a écrit.
-  Prénoms français courants variés.
+- Chaque témoin a un prénom + département (ex : "Nathalie, dans l'Ain" —
+  juste le prénom, pas de nom de famille ni d'initiale, pour rester
+  naturel à l'oral). C'est TOUJOURS le présentateur qui l'annonce, dans le
+  segment [presentateur] juste avant (voir structure ci-dessous) — jamais
+  le témoin lui-même, ni en début ni en fin de son récit : le segment
+  [histoire] correspondant commence directement par l'histoire, sans
+  aucune formule de présentation ou de signature. Prénoms français
+  courants variés.
 - Style oral : phrases courtes, respirations, langage parlé naturel.
 - Le présentateur fait une courte transition entre chaque témoignage,
   et un très bref commentaire sobre après chacun (2-3 phrases max).
