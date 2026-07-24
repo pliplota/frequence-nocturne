@@ -12,6 +12,7 @@ pipeline réel.
 Usage :
   set OPENAI_API_KEY=sk-...        (PowerShell : $env:OPENAI_API_KEY = "sk-...")
   python test_tts_openai.py
+  python test_tts_openai.py cedar                       (même test, avec une autre voix)
   python test_tts_openai.py "Un autre texte de test à lire."   (uniquement le segment histoire)
 """
 
@@ -20,18 +21,23 @@ import sys
 
 import generate_episode as ge
 
+KNOWN_VOICES = {
+    "alloy", "ash", "ballad", "coral", "echo", "fable",
+    "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar",
+}
+
 PRESENTATEUR_TEXT = (
     f"{ge.CONFIG['intro_ritual']} "
     f"Bonsoir, ici {ge.CONFIG['presenter_name']}. Ce soir, comme toutes les nuits, "
     "j'ai reçu vos témoignages. En voici un premier, qui m'a été envoyé par "
-    "Sophie L., dans les Vosges."
+    "Sophie, dans les Vosges."
 )
 
 HISTOIRE_TEXT = (
     "Je me suis réveillée vers trois heures du matin, sans raison. La "
     "maison était silencieuse. Et puis j'ai entendu, très distinctement, "
     "des pas dans le couloir. Lents. Réguliers. Je vis seule. Je n'ai "
-    "jamais retrouvé d'explication. Sophie L., dans les Vosges."
+    "jamais retrouvé d'explication."
 )
 
 
@@ -48,19 +54,27 @@ def main():
     if not os.environ.get("OPENAI_API_KEY"):
         sys.exit("ERREUR : variable d'environnement OPENAI_API_KEY absente.")
 
+    args = sys.argv[1:]
+    if len(args) == 1 and args[0].lower() in KNOWN_VOICES:
+        # Override juste pour ce run — ne touche pas config.json.
+        ge.CONFIG["openai_voice"] = args[0].lower()
+        args = []
+
     model = ge.CONFIG.get("openai_tts_model", "gpt-4o-mini-tts")
     voice = ge.CONFIG.get("openai_voice", "onyx")
     print(f"Modèle : {model}  |  Voix : {voice}")
 
-    if len(sys.argv) > 1:
+    if args:
         # Texte personnalisé : testé uniquement avec le style "histoire"
         # (c'est celui qu'on cherche à rendre plus expressif).
-        text = " ".join(sys.argv[1:])
-        synth("histoire (texte personnalisé)", text, ge._style_for_segment("openai", "histoire"), "custom")
+        text = " ".join(args)
+        synth("histoire (texte personnalisé)", text, ge._style_for_segment("openai", "histoire"), f"custom_{voice}")
         return
 
-    synth("presentateur", PRESENTATEUR_TEXT, ge._style_for_segment("openai", "presentateur"), "presentateur")
-    synth("histoire", HISTOIRE_TEXT, ge._style_for_segment("openai", "histoire"), "histoire")
+    # Suffixe avec le nom de la voix pour pouvoir garder plusieurs essais
+    # côte à côte (comparer onyx vs cedar sans que l'un écrase l'autre).
+    synth("presentateur", PRESENTATEUR_TEXT, ge._style_for_segment("openai", "presentateur"), f"presentateur_{voice}")
+    synth("histoire", HISTOIRE_TEXT, ge._style_for_segment("openai", "histoire"), f"histoire_{voice}")
 
 
 if __name__ == "__main__":
