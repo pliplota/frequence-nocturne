@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#33 — L&#x27;Observateur Caché, la Route sans Fin et le Message Ancien</title>
+      <description>Ce soir, Antoine Mercier explore des récits troublants : une présence inexpliquée dans une forêt isolée, un trajet de nuit qui défie la logique, et un vieil ordinateur qui se met à communiquer.</description>
+      <pubDate>Sun, 26 Jul 2026 16:30:04 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-07-26</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-07-26.mp3" length="13941490" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-07-26.jpg"/>
+      <itunes:duration>00:14:31</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#32 — Le Parfum des Souvenirs, l&#x27;Ombre sur la Photo et l&#x27;Air Froid du Pass
 
 </title>
