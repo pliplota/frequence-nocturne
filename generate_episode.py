@@ -250,7 +250,47 @@ def _request_gemini_text(prompt, api_key):
             "augmente maxOutputTokens dans _request_gemini_text()."
         )
     text = candidate["content"]["parts"][0]["text"]
-    return json.loads(text)
+    result = json.loads(text)
+    _validate_episode_data(result)
+    return result
+
+
+# Vu une fois en prod (2026-07-27) : réponse Gemini syntaxiquement valide
+# (JSON bien formé, finishReason=STOP) mais dont le CONTENU était corrompu —
+# des séquences d'échappement "\n" littérales à la place de plusieurs mots
+# dans le titre/la description, et un script anormalement court (épisode
+# publié de 71 secondes au lieu d'environ 14 minutes). Rien à voir avec un
+# dépassement de maxOutputTokens (déjà géré ci-dessus) : juste une mauvaise
+# génération. Cette vérification détecte ce genre de réponse avant de
+# payer la voix/l'image dessus, et déclenche un nouvel essai.
+MIN_EXPECTED_WORDS = 1500
+
+
+def _validate_episode_data(data):
+    title = data.get("title") or ""
+    description = data.get("description") or ""
+    segments = data.get("segments") or []
+
+    if "\n" in title or "\n" in description:
+        raise RetryableError(
+            "titre/description contient un retour à la ligne suspect — "
+            "réponse Gemini probablement corrompue"
+        )
+    if not title.strip() or not description.strip():
+        raise RetryableError("titre ou description vide dans la réponse Gemini")
+    if any("\n" in seg.get("text", "") for seg in segments):
+        raise RetryableError(
+            "un segment contient un retour à la ligne suspect — "
+            "réponse Gemini probablement corrompue"
+        )
+
+    total_words = sum(len(seg.get("text", "").split()) for seg in segments)
+    if total_words < MIN_EXPECTED_WORDS:
+        raise RetryableError(
+            f"script anormalement court ({total_words} mots, "
+            f"minimum {MIN_EXPECTED_WORDS} attendu) — réponse Gemini "
+            "probablement tronquée ou corrompue"
+        )
 
 
 def call_gemini(prompt):
