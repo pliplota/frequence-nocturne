@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#38 — Le Jouet Tombé, le Murmure Invisible et la Figure Immobile</title>
+      <description>Ce soir, Antoine Mercier explore une enfance troublée par l&#x27;inexplicable, l&#x27;écho d&#x27;une voix inattendue dans la solitude, et une présence silencieuse au cœur d&#x27;un atelier nocturne.</description>
+      <pubDate>Fri, 31 Jul 2026 16:30:06 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-07-31</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-07-31.mp3" length="10054888" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-07-31.jpg"/>
+      <itunes:duration>00:10:28</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#37 — La Voix Dans le Noir, les Coups Sourds et l&#x27;Oiseau Immobile</title>
       <description>Antoine Mercier reçoit ce soir les témoignages de ceux qui ont entendu des voix sans source, des bruits inexplicables, et un événement étrange vécu à deux.</description>
       <pubDate>Thu, 30 Jul 2026 16:30:06 +0000</pubDate>
