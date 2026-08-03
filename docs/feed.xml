@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#41 — Le Chien Qui Voit, la Présence en Forêt et le Bruit à la Fonderie</title>
+      <description>Cette nuit, Antoine Mercier vous lit trois témoignages. Un chien qui réagit à l&#x27;invisible, une sensation étrange en pleine nature, et des bruits inexpliqués dans une fonderie.</description>
+      <pubDate>Mon, 03 Aug 2026 16:30:06 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-08-03</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-03.mp3" length="12046463" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-03.jpg"/>
+      <itunes:duration>00:12:33</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#40 — La Lumière Solitaire, l&#x27;Heure Fixe et le Regard dans la Photo</title>
       <description>Trois auditeurs nous partagent leurs expériences nocturnes. Une lumière étrange dans un atelier désert, une horloge bloquée à une heure précise, et un détail troublant sur une vieille photographie.</description>
       <pubDate>Sun, 02 Aug 2026 16:30:06 +0000</pubDate>
