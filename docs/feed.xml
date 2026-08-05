@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#43 — L&#x27;Ombre au Jardin, le Message Silencieux et l&#x27;Écho du Passé</title>
+      <description>Ce soir, Antoine Mercier vous invite à écouter trois récits : une présence inexpliquée dans un jardin de banlieue, un signe étrange reçu après un deuil, et une photo où un détail troublant persiste. Des histoires qui remettent en question notre perception de la réalité.</description>
+      <pubDate>Wed, 05 Aug 2026 16:30:04 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-08-05</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-05.mp3" length="9982163" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-05.jpg"/>
+      <itunes:duration>00:10:24</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#42 — La Tache sur le Visage, le Murmure Inattendu et le Passant Éphémère</title>
       <description>Ce soir, Antoine Mercier explore trois nouveaux récits d&#x27;auditeurs. Une photo prise en famille révèle un détail troublant, une voix résonne dans le silence le plus complet, et une silhouette fugace défie toute explication logique.</description>
       <pubDate>Tue, 04 Aug 2026 16:30:04 +0000</pubDate>
