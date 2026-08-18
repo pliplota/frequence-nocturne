@@ -98,7 +98,7 @@ def build_prompt(past_titles):
     step = 2
     for i, theme in enumerate(themes, start=1):
         structure.append(
-            f"{step}. [histoire] TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 900-1100 mots. "
+            f"{step}. [histoire] TÉMOIGNAGE {i} : thème imposé : {theme}. Environ 1300-1500 mots. "
             "Commence directement par le récit à la première personne — le témoin ne se "
             "présente pas lui-même, le présentateur vient de le faire juste avant."
         )
@@ -597,15 +597,16 @@ def _concat_with_crossfade(part_paths, out_path, crossfade_duration=0.12):
 
 
 # Chien de garde anti-explosion de requêtes : un épisode normal tient en
-# ~8-18 morceaux selon le fournisseur (jusqu'à ~18 pour Gemini avec des
-# témoignages rallongés à 900-1100 mots chacun). Si un futur changement de
-# réglage (max_chars trop petit, régression du découpage...) en produit
+# ~11-29 morceaux selon le fournisseur (jusqu'à ~29 pour Gemini avec des
+# témoignages rallongés à 1300-1500 mots chacun — remonté à 40, depuis 30,
+# pour garder une vraie marge). Si un futur changement de réglage
+# (max_chars trop petit, régression du découpage...) en produit
 # brutalement beaucoup plus — comme le découpage phrase par phrase qui
 # avait généré ~240 requêtes et épuisé le quota Gemini en un seul épisode —
 # on préfère échouer bruyamment AVANT d'appeler l'API plutôt que de cramer
 # un budget de requêtes (quota ou, pire, crédits payants OpenAI/ElevenLabs)
 # sans s'en rendre compte.
-MAX_TTS_CHUNKS = 30
+MAX_TTS_CHUNKS = 40
 
 
 def _style_for_segment(provider, seg_type):
@@ -664,11 +665,12 @@ def synthesize(segments, out_path):
     # Découpage segment par segment (pas sur le texte entier bout à bout) :
     # un morceau ne doit jamais mélanger du texte "presentateur" et
     # "histoire", sinon on ne peut pas leur appliquer un ton différent.
-    jobs = []  # [(chunk_text, style), ...]
+    jobs = []  # [(chunk_text, style, seg_type), ...]
     for seg in segments:
-        style = _style_for_segment(provider, seg.get("type"))
+        seg_type = seg.get("type")
+        style = _style_for_segment(provider, seg_type)
         for chunk in chunk_text(seg["text"], max_chars=max_chars):
-            jobs.append((chunk, style))
+            jobs.append((chunk, style, seg_type))
 
     if len(jobs) > MAX_TTS_CHUNKS:
         sys.exit(
@@ -683,13 +685,35 @@ def synthesize(segments, out_path):
     tmp_dir = tempfile.mkdtemp(prefix="tts_")
     try:
         part_paths = []
-        for i, (chunk, style) in enumerate(jobs):
+        part_types = []
+        for i, (chunk, style, seg_type) in enumerate(jobs):
             if i > 0 and pace_seconds:
                 time.sleep(pace_seconds)
             part_path = os.path.join(tmp_dir, f"part_{i:03d}.{ext}")
             synth_fn(chunk, api_key, part_path, style=style)
             part_paths.append(part_path)
-        _concat_with_crossfade(part_paths, out_path)
+            part_types.append(seg_type)
+
+        # Insère ~1s de silence chaque fois que le type de segment change
+        # (présentateur <-> histoire), pour bien marquer la bascule à
+        # l'oreille. Les morceaux d'un même segment trop long pour tenir en
+        # un seul appel API gardent le fondu enchaîné existant, sans silence
+        # entre eux (c'est la même histoire qui continue).
+        silence_path = os.path.join(tmp_dir, "silence.mp3")
+        subprocess.check_call(
+            [
+                "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+                "-t", "1.0", "-c:a", "libmp3lame", silence_path,
+            ],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        final_parts = [part_paths[0]]
+        for i in range(1, len(part_paths)):
+            if part_types[i] != part_types[i - 1]:
+                final_parts.append(silence_path)
+            final_parts.append(part_paths[i])
+
+        _concat_with_crossfade(final_parts, out_path)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
