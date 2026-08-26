@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#64 — La Voix Silencieuse, le Mur des Ombres et l&#x27;Arbre Qui Observe</title>
+      <description>Antoine Mercier reçoit trois nouveaux témoignages qui explorent l&#x27;inexplicable : un couple face à un phénomène auditif troublant, une présence silencieuse dans une nouvelle maison et le sentiment d&#x27;être observé en pleine nature.</description>
+      <pubDate>Wed, 26 Aug 2026 16:30:03 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-08-26</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-26.mp3" length="11648148" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-26.jpg"/>
+      <itunes:duration>00:12:08</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#63 — La Musique sans Source, le Compagnon Imaginaire et la Voiture Fantôme</title>
       <description>Ce soir, Antoine Mercier explore des mystères du quotidien : une musique inexpliquée, un ami d&#x27;enfance invisible, et un véhicule étrange aperçu au travail.</description>
       <pubDate>Tue, 25 Aug 2026 16:30:03 +0000</pubDate>
