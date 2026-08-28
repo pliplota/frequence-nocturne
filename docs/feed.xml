@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#66 — L&#x27;	Écho Partagé, l&#x27;Écran Fantôme et le Visage Oublié</title>
+      <description>Ce soir, Antoine Mercier explore des récits qui défient la raison. Un événement vécu à deux, un écran qui s&#x27;allume seul, et un détail troublant sur une vieille photo.</description>
+      <pubDate>Fri, 28 Aug 2026 16:30:03 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-08-28</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-28.mp3" length="14911155" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-28.jpg"/>
+      <itunes:duration>00:15:32</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#65 — La Clé Introuvable, les Pas Sous le Plancher et le Bruit de l&#x27;Atelier</title>
       <description>Antoine Mercier vous invite à explorer trois témoignages nocturnes. Une clé disparue inexplicablement, des bruits de pas récurrents sans origine, et une présence étrange dans un atelier de nuit.</description>
       <pubDate>Thu, 27 Aug 2026 16:30:03 +0000</pubDate>
