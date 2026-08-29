@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#67 — L&#x27;Objet Inattendu, le Parfum Évanoui et la Route Sans Fin</title>
+      <description>Cette nuit, Antoine Mercier explore trois récits qui défient la logique: un objet mystérieusement déplacé, une odeur du passé ressurgissant et une rencontre troublante sur une route solitaire. Des auditeurs partagent leurs expériences inexplicables, nous plongeant dans l&#x27;incertitude du réel.</description>
+      <pubDate>Sat, 29 Aug 2026 16:30:03 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-08-29</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-29.mp3" length="9378212" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-08-29.jpg"/>
+      <itunes:duration>00:09:46</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#66 — L&#x27;	Écho Partagé, l&#x27;Écran Fantôme et le Visage Oublié</title>
       <description>Ce soir, Antoine Mercier explore des récits qui défient la raison. Un événement vécu à deux, un écran qui s&#x27;allume seul, et un détail troublant sur une vieille photo.</description>
       <pubDate>Fri, 28 Aug 2026 16:30:03 +0000</pubDate>
