@@ -651,5 +651,15 @@
     "duration": "00:10:24",
     "guid": "frequence-nocturne-2026-08-30",
     "image": "2026-08-30.jpg"
+  },
+  {
+    "title": "#69 — L'Ombre au Quai, le Souffle Froid et le Cri Lointain",
+    "description": "Cette nuit, Antoine Mercier explore les mystères de l'inexplicable. Au programme : une silhouette inquiétante sur les quais, une présence glaciale à domicile et une voix étrange perçue dans la solitude.",
+    "date": "2026-08-31T16:30:03.983012+00:00",
+    "file": "2026-08-31.mp3",
+    "bytes": 13684863,
+    "duration": "00:14:15",
+    "guid": "frequence-nocturne-2026-08-31",
+    "image": "2026-08-31.jpg"
   }
 ]
