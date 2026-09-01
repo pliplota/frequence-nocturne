@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#70 — L&#x27;Arrêt Imprévu, la Lavande Oubliée et l&#x27;Ami Disparu</title>
+      <description>Ce soir, Antoine Mercier explore trois récits troublants : un arrêt inexpliqué sur une route de campagne, une odeur de lavande aux confins de la mémoire, et l&#x27;écho persistant d&#x27;une amitié d&#x27;enfance disparue. Des mystères qui défient toute explication logique.</description>
+      <pubDate>Tue, 01 Sep 2026 16:30:03 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-09-01</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-09-01.mp3" length="11366862" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-09-01.jpg"/>
+      <itunes:duration>00:11:50</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#69 — L&#x27;Ombre au Quai, le Souffle Froid et le Cri Lointain</title>
       <description>Cette nuit, Antoine Mercier explore les mystères de l&#x27;inexplicable. Au programme : une silhouette inquiétante sur les quais, une présence glaciale à domicile et une voix étrange perçue dans la solitude.</description>
       <pubDate>Mon, 31 Aug 2026 16:30:03 +0000</pubDate>
