@@ -17,6 +17,17 @@
     <itunes:category text="Society &amp; Culture"/>
     <itunes:explicit>false</itunes:explicit>
     <item>
+      <title>#73 — La Veilleuse Oubliée, le Bruit de la Pompe et les Coups du Bois</title>
+      <description>Antoine Mercier explore trois nouvelles énigmes nocturnes: une sensation troublante dans une cabane isolée, des incidents étranges dans une usine de nuit, et des bruits inexpliqués au cœur de la forêt.</description>
+      <pubDate>Sat, 05 Sep 2026 16:30:03 +0000</pubDate>
+      <guid isPermaLink="false">frequence-nocturne-2026-09-05</guid>
+      <enclosure url="https://pliplota.github.io/frequence-nocturne/episodes/2026-09-05.mp3" length="15225043" type="audio/mpeg"/>
+      <itunes:image href="https://pliplota.github.io/frequence-nocturne/episodes/2026-09-05.jpg"/>
+      <itunes:duration>00:15:51</itunes:duration>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
       <title>#72 — L&#x27;Iris et le Chat, la Porte et l&#x27;Horloge</title>
       <description>Ce soir, Antoine Mercier explore une odeur d&#x27;iris insaisissable, un chat qui voit l&#x27;invisible, et des bruits mystérieux derrière une porte. Des témoignages troublants qui défient toute explication.</description>
       <pubDate>Fri, 04 Sep 2026 16:30:03 +0000</pubDate>
